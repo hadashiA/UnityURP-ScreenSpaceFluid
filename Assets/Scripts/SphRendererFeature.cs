@@ -52,7 +52,8 @@ public class SphRendererFeature : ScriptableRendererFeature
     // This method is called when setting up the renderer once per-camera.
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
-        pass.SetUp(renderingData.cameraData.targetTexture);
+        // pass.SetUp(renderingData.cameraData.targetTexture);
+        pass.SetUp(RenderTargetHandle.CameraTarget);
         renderer.EnqueuePass(pass);
     }
 }

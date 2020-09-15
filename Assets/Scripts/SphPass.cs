@@ -18,7 +18,7 @@ public class SphPass : ScriptableRenderPass
     readonly int upSamplingPass;
     readonly int applySphPass;
 
-    RenderTargetIdentifier source;
+    RenderTargetHandle source;
     FilteringSettings filteringSettings;
 
     public SphPass(
@@ -46,24 +46,14 @@ public class SphPass : ScriptableRenderPass
         applySphPass = material.FindPass("ApplySph");
     }
 
-    public void SetUp(RenderTargetIdentifier source)
+    public void SetUp(RenderTargetHandle source)
     {
         this.source = source;
     }
 
-    public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
-    {
-        var depthTargetDescriptor = new RenderTextureDescriptor(
-            cameraTextureDescriptor.width,
-            cameraTextureDescriptor.height,
-            RenderTextureFormat.ARGB32,
-            16);
-        depthTargetDescriptor.msaaSamples = 1;
-
-        cmd.GetTemporaryRT(sphDepthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
-        cmd.SetRenderTarget(sphDepthTargetHandle.id);
-        cmd.ClearRenderTarget(true, true, Color.black, 1f);
-    }
+    // public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
+    // {
+    // }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
     {
@@ -91,20 +81,30 @@ public class SphPass : ScriptableRenderPass
         frustomCorners[2] = frustomCornersBuffer[1];
         frustomCorners[3] = frustomCornersBuffer[2];
 
+        ref var cameraTargetDescriptor = ref renderingData.cameraData.cameraTargetDescriptor;
+        var depthTargetDescriptor = new RenderTextureDescriptor(
+            cameraTargetDescriptor.width,
+            cameraTargetDescriptor.height,
+            RenderTextureFormat.ARGB32,
+            16)
+        {
+            msaaSamples = 1
+        };
+
+        cmd.GetTemporaryRT(sphDepthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
+        cmd.SetRenderTarget(sphDepthTargetHandle.id);
+        cmd.ClearRenderTarget(true, true, Color.black, 1f);
+
         cmd.SetGlobalVectorArray("_FrustumCorners", frustomCorners);
 
-        // var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
-        // var drawSettings = CreateDrawingSettings(sphDepthShaderTagId, ref renderingData, sortFlags);
-        // drawSettings.perObjectData = PerObjectData.None;
-        // drawSettings.overrideMaterial = material;
-        // drawSettings.overrideMaterialPassIndex = elementDepthPass;
-        // context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
+        var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
+        var drawSettings = CreateDrawingSettings(sphDepthShaderTagId, ref renderingData, sortFlags);
+        drawSettings.perObjectData = PerObjectData.None;
+        drawSettings.overrideMaterial = material;
+        drawSettings.overrideMaterialPassIndex = elementDepthPass;
+        context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
-        cmd.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
-        cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, material, 0, applySphPass);
-        cmd.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
-
-        // Blit(cmd, sphDepthTargetHandle.id, source, material, applySphPass);
+        Blit(cmd, sphDepthTargetHandle.id, source.Identifier(), material, applySphPass);
 
         // Blurring
 
