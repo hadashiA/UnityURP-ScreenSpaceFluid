@@ -125,10 +125,10 @@
                 half2 deltaU = half2(_SphDepthTexture_TexelSize.x * 0.5, 0);
                 half2 deltaV = half2(_SphDepthTexture_TexelSize.y * 0.5, 0);
 
-                float3 ddx = CalculatePositionVS(input.uv - deltaU) - CalculatePositionVS(input.uv + deltaU);
-                float3 ddy = CalculatePositionVS(input.uv - deltaV) - CalculatePositionVS(input.uv + deltaV);
+                float3 dx = CalculatePositionVS(input.uv - deltaU) - CalculatePositionVS(input.uv + deltaU);
+                float3 dy = CalculatePositionVS(input.uv - deltaV) - CalculatePositionVS(input.uv + deltaV);
 
-                half3 n = cross(ddx, ddy);
+                half3 n = cross(dx, dy);
                 n = normalize(n);
                 return half4(1, 0, 0, 1);
             }

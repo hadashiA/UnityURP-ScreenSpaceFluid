@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-3797474005009844477
+--- !u!114 &-903227466817731648
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -15,7 +15,7 @@ MonoBehaviour:
   m_Active: 1
   settings:
     SphShader: {fileID: 4800000, guid: f8e7783eb94264fc9a83a07dcd92ce31, type: 3}
-    Event: 450
+    Event: 1000
     LayerMask:
       serializedVersion: 2
       m_Bits: 256
@@ -35,8 +35,8 @@ MonoBehaviour:
   m_Name: ForwardRenderer
   m_EditorClassIdentifier: 
   m_RendererFeatures:
-  - {fileID: -3797474005009844477}
-  m_RendererFeatureMap: 03b79b2783a94ccb
+  - {fileID: -903227466817731648}
+  m_RendererFeatureMap: c003f488671777f3
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   shaders:
     blitPS: {fileID: 4800000, guid: c17132b1f77d20942aa75f8429c0f8bc, type: 3}

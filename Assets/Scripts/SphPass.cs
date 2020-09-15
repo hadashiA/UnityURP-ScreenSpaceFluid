@@ -4,8 +4,6 @@ using UnityEngine.Rendering.Universal;
 
 public class SphPass : ScriptableRenderPass
 {
-    public RenderTargetIdentifier SourceIdentifier;
-
     readonly ProfilingSampler profilingSampler = new ProfilingSampler("Sph");
     readonly ShaderTagId sphDepthShaderTagId = new ShaderTagId("SphDepth");
 
@@ -15,10 +13,12 @@ public class SphPass : ScriptableRenderPass
     readonly Vector3[] frustomCornersBuffer = new Vector3[4];
     readonly Vector4[] frustomCorners = new Vector4[4];
 
+    readonly int elementDepthPass;
     readonly int downSamplingPass;
     readonly int upSamplingPass;
     readonly int applySphPass;
 
+    RenderTargetIdentifier source;
     FilteringSettings filteringSettings;
 
     public SphPass(
@@ -40,19 +40,34 @@ public class SphPass : ScriptableRenderPass
 
         sphDepthTargetHandle.Init("_SphDepthTexture");
 
+        elementDepthPass = material.FindPass("ElementDepth");
         downSamplingPass = material.FindPass("DownSampling");
         upSamplingPass = material.FindPass("UpSampling");
         applySphPass = material.FindPass("ApplySph");
     }
 
+    public void SetUp(RenderTargetIdentifier source)
+    {
+        this.source = source;
+    }
+
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
+        var depthTargetDescriptor = new RenderTextureDescriptor(
+            cameraTextureDescriptor.width,
+            cameraTextureDescriptor.height,
+            RenderTextureFormat.ARGB32,
+            16);
+        depthTargetDescriptor.msaaSamples = 1;
+
+        cmd.GetTemporaryRT(sphDepthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
+        cmd.SetRenderTarget(sphDepthTargetHandle.id);
+        cmd.ClearRenderTarget(true, true, Color.black, 1f);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
     {
         var cmd = CommandBufferPool.Get(profilingSampler.name);
-        var cameraTargetDescriptor = renderingData.cameraData.cameraTargetDescriptor;
         // targetDescriptor.depthBufferBits = 0;
 
         // cmd.GetTemporaryRT(metaballSourceHandle.id, targetDescriptor, FilterMode.Bilinear);
@@ -78,23 +93,18 @@ public class SphPass : ScriptableRenderPass
 
         cmd.SetGlobalVectorArray("_FrustumCorners", frustomCorners);
 
-        var depthTargetDescriptor = new RenderTextureDescriptor(
-            cameraTargetDescriptor.width,
-            cameraTargetDescriptor.height,
-            RenderTextureFormat.Depth,
-            16);
-        depthTargetDescriptor.msaaSamples = 1;
+        // var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
+        // var drawSettings = CreateDrawingSettings(sphDepthShaderTagId, ref renderingData, sortFlags);
+        // drawSettings.perObjectData = PerObjectData.None;
+        // drawSettings.overrideMaterial = material;
+        // drawSettings.overrideMaterialPassIndex = elementDepthPass;
+        // context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
-        cmd.GetTemporaryRT(sphDepthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
-        cmd.SetRenderTarget(sphDepthTargetHandle.id);
-        cmd.ClearRenderTarget(true, true, Color.red, 1f);
+        cmd.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
+        cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, material, 0, applySphPass);
+        cmd.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
 
-        var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
-        var drawSettings = CreateDrawingSettings(sphDepthShaderTagId, ref renderingData, sortFlags);
-        drawSettings.perObjectData = PerObjectData.None;
-        context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
-
-        // cmd.Blit(sphDepthTargetHandle.id, SourceIdentifier, material, applySphPass);
+        // Blit(cmd, sphDepthTargetHandle.id, source, material, applySphPass);
 
         // Blurring
 
