@@ -8,6 +8,7 @@
     SubShader
     {
         Tags { "RenderType"="Opaque" }
+        ZWrite On
 
         Pass
         {
@@ -20,7 +21,6 @@
             #pragma vertex DepthOnlyVertex
             #pragma fragment DepthOnlyFragment
             #pragma multi_compile_instancing
-
 
             struct Attributes
             {
@@ -51,7 +51,8 @@
             half4 DepthOnlyFragment(Varyings input) : SV_TARGET
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-                half depth = UNITY_Z_0_FAR_FROM_CLIPSPACE(input.positionCS.z);
+                // half depth = UNITY_Z_0_FAR_FROM_CLIPSPACE(input.positionCS.z);
+                half depth = input.positionCS.z;
                 return depth;
             }
             ENDHLSL

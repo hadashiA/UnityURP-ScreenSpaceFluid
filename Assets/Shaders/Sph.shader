@@ -8,7 +8,7 @@
     SubShader
     {
         // No culling or depth
-        Cull Off ZWrite Off ZTest Always
+        // Cull Off ZWrite Off ZTest Always
 
         HLSLINCLUDE
         // Required to compile gles 2.0 with standard srp library
@@ -77,7 +77,6 @@
         Pass
         {
             Name "UpSampling"
-            Blend [_SrcBlend] [_DstBlend]
 
             HLSLPROGRAM
             #pragma vertex PassVertex
@@ -98,14 +97,40 @@
             #pragma vertex PassVertex
             #pragma fragment ApplySphPassFragment
 
-            uniform TEXTURE2D(_ColorRamp);
-            uniform float _Threshold;
-            uniform float _LineLength;
+            uniform float3 _FrustumCorners[4];
+            uniform TEXTURE2D(_SphDepthTexture);
+            uniform SAMPLER(sampler_SphDepthTexture);
+            uniform float4 _SphDepthTexture_TexelSize;
+
+            float3 CalculatePositionVS(float2 uv)
+            {
+                half depth = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, uv);
+
+                // We can simply use the UV coordinates to access the corner array.
+                // The frustum coordinates are (0, 0), (1, 0), (0, 1), and (1, 1). So the index is u+2v.
+                float3 ray = _FrustumCorners[uv.x + 2 * uv.y];
+                return ray * depth;
+            }
 
             half4 ApplySphPassFragment(Varyings input) : SV_Target
             {
-                half4 c = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
-                return c;
+                // float3 pos = CalculatePositionVS(input.uv);
+                //
+                // half2 deltaU = half2(_SphDepthTexture_TexelSize.x, 0);
+                // half2 deltaV = half2(_SphDepthTexture_TexelSize.y, 0);
+                //
+                // half2 ddx = CalculatePositionVS(input.uv + deltaU) - pos;
+                // half2 ddx2 = pos - CalculatePositionVS(input.uv - deltaU);
+
+                half2 deltaU = half2(_SphDepthTexture_TexelSize.x * 0.5, 0);
+                half2 deltaV = half2(_SphDepthTexture_TexelSize.y * 0.5, 0);
+
+                float3 ddx = CalculatePositionVS(input.uv - deltaU) - CalculatePositionVS(input.uv + deltaU);
+                float3 ddy = CalculatePositionVS(input.uv - deltaV) - CalculatePositionVS(input.uv + deltaV);
+
+                half3 n = cross(ddx, ddy);
+                n = normalize(n);
+                return half4(1, 0, 0, 1);
             }
             ENDHLSL
 

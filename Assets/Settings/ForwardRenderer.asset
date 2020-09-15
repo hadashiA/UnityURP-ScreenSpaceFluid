@@ -14,11 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Active: 1
   settings:
-    SphShader: {fileID: 0}
+    SphShader: {fileID: 4800000, guid: f8e7783eb94264fc9a83a07dcd92ce31, type: 3}
     Event: 450
     LayerMask:
       serializedVersion: 2
-      m_Bits: 0
+      m_Bits: 256
     BlurryIterations: 1
     RenderQueueLowerBound: 0
     RenderQueueUpperBound: 5000
