@@ -35,6 +35,7 @@ public class SphRendererFeature : ScriptableRendererFeature
             sphShader = Shader.Find("SampleSph/Hidden/Sph");
 
         var sphMaterial = CoreUtils.CreateEngineMaterial(sphShader);
+        sphMaterial.enableInstancing = true;
 
         var renderQueueRange = new RenderQueueRange(
             settings.RenderQueueLowerBound,
@@ -52,8 +53,7 @@ public class SphRendererFeature : ScriptableRendererFeature
     // This method is called when setting up the renderer once per-camera.
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
-        // pass.SetUp(renderingData.cameraData.targetTexture);
-        pass.SetUp(RenderTargetHandle.CameraTarget);
+        pass.SetUp(renderer.cameraColorTarget);
         renderer.EnqueuePass(pass);
     }
 }

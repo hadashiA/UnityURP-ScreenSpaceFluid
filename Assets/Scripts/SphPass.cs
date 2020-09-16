@@ -11,14 +11,13 @@ public class SphPass : ScriptableRenderPass
     readonly RenderTargetHandle sphDepthTargetHandle;
     readonly RenderTargetHandle[] blurringTargetHandles;
     readonly Vector3[] frustomCornersBuffer = new Vector3[4];
-    readonly Vector4[] frustomCorners = new Vector4[4];
 
     readonly int elementDepthPass;
     readonly int downSamplingPass;
     readonly int upSamplingPass;
     readonly int applySphPass;
 
-    RenderTargetHandle source;
+    RenderTargetIdentifier source;
     FilteringSettings filteringSettings;
 
     public SphPass(
@@ -46,26 +45,48 @@ public class SphPass : ScriptableRenderPass
         applySphPass = material.FindPass("ApplySph");
     }
 
-    public void SetUp(RenderTargetHandle source)
+    public void SetUp(RenderTargetIdentifier source)
     {
         this.source = source;
     }
 
-    // public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
-    // {
-    // }
+    public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
+    {
+        var depthTargetDescriptor = cameraTextureDescriptor;
+        depthTargetDescriptor.colorFormat = RenderTextureFormat.RFloat;
+        depthTargetDescriptor.depthBufferBits = 1;
+        depthTargetDescriptor.msaaSamples = 1;
+
+        cmd.GetTemporaryRT(sphDepthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
+        ConfigureTarget(sphDepthTargetHandle.id);
+        ConfigureClear(ClearFlag.All, Color.black);
+    }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
     {
         var cmd = CommandBufferPool.Get(profilingSampler.name);
-        // targetDescriptor.depthBufferBits = 0;
 
-        // cmd.GetTemporaryRT(metaballSourceHandle.id, targetDescriptor, FilterMode.Bilinear);
-        // cmd.SetRenderTarget(metaballSourceHandle.id);
-        // cmd.ClearRenderTarget(true, true, Color.black, 1f);
+        // var depthTargetDescriptor = renderingData.cameraData.cameraTargetDescriptor;
+        // depthTargetDescriptor.colorFormat =
+        // depthTargetDescriptor.depthBufferBits = 1;
+        // depthTargetDescriptor.msaaSamples = 1;
+        //
+        // cmd.GetTemporaryRT(sphDepthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
+        // cmd.SetRenderTarget(sphDepthTargetHandle.id);
+        // cmd.ClearRenderTarget(true, true, Color.red, 1f);
 
-        // cmd.GetTemporaryRT(sphDepthTargetHandle.id);
+        // Draw depth
+        var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
+        var drawSettings = CreateDrawingSettings(sphDepthShaderTagId, ref renderingData, sortFlags);
+        drawSettings.perObjectData = PerObjectData.None;
+        // drawSettings.overrideMaterial = material;
+        // drawSettings.overrideMaterialPassIndex = elementDepthPass;
+        context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
+
+        // Draw normal
+        //
+        // CalculateFrustumCorners returns bottom-left, top-left, top-right, bottom-right.
         var camera = renderingData.cameraData.camera;
         camera.CalculateFrustumCorners(
             new Rect(0f, 0f, 1f, 1f),
@@ -73,38 +94,15 @@ public class SphPass : ScriptableRenderPass
             camera.stereoActiveEye,
             frustomCornersBuffer);
 
-        // CalculateFrustumCorners orders them bottom-left, top-left, top-right, bottom-right.
-        // However, the quad used to render the image effect has its corner vertices ordered bottom-left, bottom-right, top-left, top-right.
-        // So let's reorder them to match the quad's vertices.
-        frustomCorners[0] = frustomCornersBuffer[0];
-        frustomCorners[1] = frustomCornersBuffer[3];
-        frustomCorners[2] = frustomCornersBuffer[1];
-        frustomCorners[3] = frustomCornersBuffer[2];
-
-        ref var cameraTargetDescriptor = ref renderingData.cameraData.cameraTargetDescriptor;
-        var depthTargetDescriptor = new RenderTextureDescriptor(
-            cameraTargetDescriptor.width,
-            cameraTargetDescriptor.height,
-            RenderTextureFormat.ARGB32,
-            16)
-        {
-            msaaSamples = 1
-        };
-
-        cmd.GetTemporaryRT(sphDepthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
-        cmd.SetRenderTarget(sphDepthTargetHandle.id);
-        cmd.ClearRenderTarget(true, true, Color.black, 1f);
-
-        cmd.SetGlobalVectorArray("_FrustumCorners", frustomCorners);
-
-        var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
-        var drawSettings = CreateDrawingSettings(sphDepthShaderTagId, ref renderingData, sortFlags);
-        drawSettings.perObjectData = PerObjectData.None;
-        drawSettings.overrideMaterial = material;
-        drawSettings.overrideMaterialPassIndex = elementDepthPass;
-        context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
-
-        Blit(cmd, sphDepthTargetHandle.id, source.Identifier(), material, applySphPass);
+        var frustumRect = new Vector4(
+            frustomCornersBuffer[0].x, // left
+            frustomCornersBuffer[2].x, // right
+            frustomCornersBuffer[0].y, // bottom
+            frustomCornersBuffer[1].y // top
+            );
+        cmd.SetGlobalVector("_FrustumRect", frustumRect);
+        cmd.Blit(sphDepthTargetHandle.id, source, material, applySphPass);
+        // cmd.Blit(sphDepthTargetHandle.id, source);
 
         // Blurring
 

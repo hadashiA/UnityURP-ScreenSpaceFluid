@@ -15,7 +15,7 @@ MonoBehaviour:
   m_Active: 1
   settings:
     SphShader: {fileID: 4800000, guid: f8e7783eb94264fc9a83a07dcd92ce31, type: 3}
-    Event: 1000
+    Event: 450
     LayerMask:
       serializedVersion: 2
       m_Bits: 256

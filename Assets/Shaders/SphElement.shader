@@ -53,6 +53,7 @@
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 // half depth = UNITY_Z_0_FAR_FROM_CLIPSPACE(input.positionCS.z);
                 half depth = input.positionCS.z;
+                // depth = Linear01Depth(depth, _ZBufferParams);
                 return depth;
             }
             ENDHLSL
