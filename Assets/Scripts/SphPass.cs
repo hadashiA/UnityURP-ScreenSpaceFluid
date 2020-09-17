@@ -4,6 +4,8 @@ using UnityEngine.Rendering.Universal;
 
 public class SphPass : ScriptableRenderPass
 {
+    int BlurringIterations => blurringTargetHandles.Length;
+
     readonly ProfilingSampler profilingSampler = new ProfilingSampler("Sph");
     readonly ShaderTagId sphDepthShaderTagId = new ShaderTagId("BillboardSphereDepth");
 
@@ -12,7 +14,6 @@ public class SphPass : ScriptableRenderPass
     readonly RenderTargetHandle[] blurringTargetHandles;
     readonly Vector3[] frustomCornersBuffer = new Vector3[4];
 
-    readonly int elementDepthPass;
     readonly int downSamplingPass;
     readonly int upSamplingPass;
     readonly int applySphPass;
@@ -39,7 +40,6 @@ public class SphPass : ScriptableRenderPass
 
         sphDepthTargetHandle.Init("_SphDepthTexture");
 
-        elementDepthPass = material.FindPass("ElementDepth");
         downSamplingPass = material.FindPass("DownSampling");
         upSamplingPass = material.FindPass("UpSampling");
         applySphPass = material.FindPass("ApplySph");
@@ -53,8 +53,8 @@ public class SphPass : ScriptableRenderPass
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
         var depthTargetDescriptor = cameraTextureDescriptor;
-        depthTargetDescriptor.colorFormat = RenderTextureFormat.RHalf;
-        depthTargetDescriptor.depthBufferBits = 1;
+        depthTargetDescriptor.colorFormat = RenderTextureFormat.RFloat;
+        depthTargetDescriptor.depthBufferBits = 0;
         depthTargetDescriptor.msaaSamples = 1;
 
         cmd.GetTemporaryRT(sphDepthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
@@ -66,13 +66,7 @@ public class SphPass : ScriptableRenderPass
     {
         var cmd = CommandBufferPool.Get(profilingSampler.name);
 
-        // var depthTargetDescriptor = renderingData.cameraData.cameraTargetDescriptor;
-        // depthTargetDescriptor.colorFormat =
-        // depthTargetDescriptor.depthBufferBits = 1;
-        // depthTargetDescriptor.msaaSamples = 1;
-        //
-        // cmd.GetTemporaryRT(sphDepthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
-        // cmd.SetRenderTarget(sphDepthTargetHandle.id);
+        cmd.SetRenderTarget(sphDepthTargetHandle.id);
         // cmd.ClearRenderTarget(true, true, Color.red, 1f);
 
         // Draw depth
@@ -83,9 +77,48 @@ public class SphPass : ScriptableRenderPass
         // drawSettings.overrideMaterialPassIndex = elementDepthPass;
         context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
+        // Blurring
+
+        // Down sampling
+        var blurringTargetDescriptor = renderingData.cameraData.cameraTargetDescriptor;
+        blurringTargetDescriptor.depthBufferBits = 0;
+        blurringTargetDescriptor.msaaSamples = 1;
+
+        var currentSource = sphDepthTargetHandle;
+        var currentDestination = blurringTargetHandles[0];
+
+        blurringTargetDescriptor.width /= 2;
+        blurringTargetDescriptor.height /= 2;
+        cmd.GetTemporaryRT(currentDestination.id, blurringTargetDescriptor, FilterMode.Bilinear);
+        cmd.Blit(currentSource.id, currentDestination.id, material, downSamplingPass);
+        cmd.ReleaseTemporaryRT(currentSource.id);
+
+        for (var i = 1; i < BlurringIterations; i++)
+        {
+            currentSource = currentDestination;
+            currentDestination = blurringTargetHandles[i];
+
+            blurringTargetDescriptor.width /= 2;
+            blurringTargetDescriptor.height /= 2;
+            cmd.GetTemporaryRT(currentDestination.id, blurringTargetDescriptor, FilterMode.Bilinear);
+            cmd.Blit(currentSource.id, currentDestination.id, material, downSamplingPass);
+        }
+
+        // Up sampling
+        for (var i = BlurringIterations - 2; i >= 0; i--)
+        {
+            currentSource = currentDestination;
+            currentDestination = blurringTargetHandles[i];
+
+            cmd.Blit(currentSource.id, currentDestination.id, material, upSamplingPass);
+            cmd.ReleaseTemporaryRT(currentSource.id);
+        }
+
+        cmd.SetGlobalTexture("_SphDepthTexture", currentDestination.id);
+
 
         // Draw normal
-        //
+
         // CalculateFrustumCorners returns bottom-left, top-left, top-right, bottom-right.
         var camera = renderingData.cameraData.camera;
         camera.CalculateFrustumCorners(
@@ -98,47 +131,11 @@ public class SphPass : ScriptableRenderPass
             frustomCornersBuffer[0].x, // left
             frustomCornersBuffer[2].x, // right
             frustomCornersBuffer[0].y, // bottom
-            frustomCornersBuffer[1].y // top
-            );
+            frustomCornersBuffer[1].y); // top
+
         cmd.SetGlobalVector("_FrustumRect", frustumRect);
-        cmd.Blit(sphDepthTargetHandle.id, source, material, applySphPass);
-        // cmd.Blit(sphDepthTargetHandle.id, source);
-
-        // Blurring
-
-        // // Down sampling
-        // var currentSource = metaballSourceHandle;
-        // var currentDestination = temporatyTargetHandles[0];
-        //
-        // targetDescriptor.width /= 2;
-        // targetDescriptor.height /= 2;
-        // cmd.GetTemporaryRT(currentDestination.id, targetDescriptor, FilterMode.Bilinear);
-        // cmd.Blit(currentSource.id, currentDestination.id, metaballMaterial, downSamplingPass);
-        // cmd.ReleaseTemporaryRT(currentSource.id);
-        //
-        // for (var i = 1; i < BlurryIterations; i++)
-        // {
-        //     currentSource = currentDestination;
-        //     currentDestination = temporatyTargetHandles[i];
-        //
-        //     targetDescriptor.width /= 2;
-        //     targetDescriptor.height /= 2;
-        //     cmd.GetTemporaryRT(currentDestination.id, targetDescriptor, FilterMode.Bilinear);
-        //     cmd.Blit(currentSource.id, currentDestination.id, metaballMaterial, downSamplingPass);
-        // }
-        //
-        // // Up sampling
-        // for (var i = BlurryIterations - 2; i >= 0; i--)
-        // {
-        //     currentSource = currentDestination;
-        //     currentDestination = temporatyTargetHandles[i];
-        //
-        //     cmd.Blit(currentSource.id, currentDestination.id, metaballMaterial, upSamplingPass);
-        //     cmd.ReleaseTemporaryRT(currentSource.id);
-        // }
-        //
-        // // cmd.SetGlobalTexture("_MetaballSource", currentDestination.Identifier());
-        // cmd.Blit(currentDestination.id, SourceIdentifier, metaballMaterial, applyMetaballPass);
+        cmd.Blit(currentDestination.id, source, material, applySphPass);
+        // cmd.Blit(currentDestination.id, source);
 
         context.ExecuteCommandBuffer(cmd);
         CommandBufferPool.Release(cmd);

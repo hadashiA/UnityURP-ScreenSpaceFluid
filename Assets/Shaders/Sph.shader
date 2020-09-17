@@ -99,7 +99,9 @@
             #pragma vertex PassVertex
             #pragma fragment ApplySphPassFragment
 
+            uniform half _DepthThreshold;
             uniform float4 _FrustumRect;
+
             uniform TEXTURE2D(_SphDepthTexture);
             uniform SAMPLER(sampler_SphDepthTexture);
             uniform float4 _SphDepthTexture_TexelSize;
@@ -118,8 +120,7 @@
 
             half4 ApplySphPassFragment(Varyings input) : SV_Target
             {
-                float3 pos = CalculatePositionVS(input.uv);
-
+                half depth = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv);
 
                 float2 deltaU = float2(_SphDepthTexture_TexelSize.x, 0);
                 float2 deltaV = float2(0, _SphDepthTexture_TexelSize.y);
@@ -151,7 +152,7 @@
                 //
                 // half3 n = cross(ddy, ddx);
                 n = normalize(n);
-                // n = TransformObjectToWorldNormal(n);
+                n = depth < _DepthThreshold ? 0 : n;
 
                 // return half4(n * 0.5 + 0.5, 1);
                 return half4(n * 0.5 + 0.5, 1);

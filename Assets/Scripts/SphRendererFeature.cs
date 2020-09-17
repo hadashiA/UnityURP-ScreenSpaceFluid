@@ -13,6 +13,9 @@ public class SphRendererFeature : ScriptableRendererFeature
 
         public LayerMask LayerMask;
 
+        [Range(0, 1)]
+        public float DepthThreshold = 0.001f;
+
         [Range(1, 16)]
         public int BlurryIterations = 1;
 
@@ -36,6 +39,7 @@ public class SphRendererFeature : ScriptableRendererFeature
 
         var sphMaterial = CoreUtils.CreateEngineMaterial(sphShader);
         sphMaterial.enableInstancing = true;
+        sphMaterial.SetFloat("_DepthThreshold", settings.DepthThreshold);
 
         var renderQueueRange = new RenderQueueRange(
             settings.RenderQueueLowerBound,
