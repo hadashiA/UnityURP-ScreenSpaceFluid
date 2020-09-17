@@ -54,7 +54,7 @@ public class SphPass : ScriptableRenderPass
     {
         var depthTargetDescriptor = cameraTextureDescriptor;
         depthTargetDescriptor.colorFormat = RenderTextureFormat.RFloat;
-        depthTargetDescriptor.depthBufferBits = 0;
+        depthTargetDescriptor.depthBufferBits = 24;
         depthTargetDescriptor.msaaSamples = 1;
 
         cmd.GetTemporaryRT(sphDepthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
@@ -81,7 +81,7 @@ public class SphPass : ScriptableRenderPass
 
         // Down sampling
         var blurringTargetDescriptor = renderingData.cameraData.cameraTargetDescriptor;
-        blurringTargetDescriptor.depthBufferBits = 0;
+        blurringTargetDescriptor.depthBufferBits = 24;
         blurringTargetDescriptor.msaaSamples = 1;
 
         var currentSource = sphDepthTargetHandle;
@@ -135,6 +135,11 @@ public class SphPass : ScriptableRenderPass
         cmd.SetGlobalVector("_FrustumRect", frustumRect);
         cmd.Blit(source, source, material, applySphPass);
         // cmd.Blit(currentDestination.id, source);
+
+        // cmd.SetRenderTarget(source);
+        // cmd.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
+        // cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, material, 0, applySphPass);
+        // cmd.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
 
         context.ExecuteCommandBuffer(cmd);
         CommandBufferPool.Release(cmd);

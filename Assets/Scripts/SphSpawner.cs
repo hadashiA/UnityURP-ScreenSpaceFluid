@@ -41,14 +41,18 @@ public class SphSpawner : MonoBehaviour
     void Spawn()
     {
         var element = Instantiate(elementPrefab);
-        element.transform.SetParent(transform, false);
-        element.transform.localPosition = Vector3.zero;
         elements.Add((element, elapsed + lifetime));
 
-        // var force = new Vector3(
-        //     UnityEngine.Random.Range(-1f, 51f),
-        //     10f + UnityEngine.Random.Range(0, 10f),
-        //     UnityEngine.Random.Range(-1f, 1f));
-        // element.AddForce(force);
+        element.transform.SetParent(transform, false);
+        element.transform.localPosition = new Vector3(
+                UnityEngine.Random.Range(-0.1f, 0.1f),
+                UnityEngine.Random.Range(-0.1f, 0.1f),
+                UnityEngine.Random.Range(-0.1f, 0.1f));
+
+        var force = new Vector3(
+            UnityEngine.Random.Range(-10f, 10f),
+            0f,
+            UnityEngine.Random.Range(-10f, 10f));
+        element.AddForce(force);
     }
 }

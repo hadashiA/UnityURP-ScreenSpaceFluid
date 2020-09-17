@@ -154,9 +154,10 @@
             half4 ApplySphPassFragment(Varyings input) : SV_Target
             {
                 // Calculate Normal
-                half destDepth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, input.uv);
+                // half destDepth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, input.uv);
                 half depth = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv);
-                half enabled = depth > _DepthThreshold && depth < destDepth ? 1 : 0;
+                // half enabled = depth > _DepthThreshold && depth < destDepth ? 1 : 0;
+                half enabled = depth > _DepthThreshold ? 1 : 0;
 
                 float2 deltaU = float2(_SphDepthTexture_TexelSize.x, 0);
                 float2 deltaV = float2(0, _SphDepthTexture_TexelSize.y);
