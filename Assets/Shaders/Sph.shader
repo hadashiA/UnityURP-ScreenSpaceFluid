@@ -113,8 +113,6 @@
                     lerp(_FrustumRect[2], _FrustumRect[3], uv.y),
                     _ProjectionParams.z);
 
-                ray = normalize(ray);
-
                 return ray * depth;
             }
 
@@ -123,13 +121,25 @@
                 float3 pos = CalculatePositionVS(input.uv);
 
 
-                half2 deltaU = half2(_SphDepthTexture_TexelSize.x * 0.5, 0);
-                half2 deltaV = half2(0, _SphDepthTexture_TexelSize.y * 0.5);
+                float2 deltaU = float2(_SphDepthTexture_TexelSize.x, 0);
+                float2 deltaV = float2(0, _SphDepthTexture_TexelSize.y);
 
-                float3 dx = CalculatePositionVS(input.uv - deltaU) - CalculatePositionVS(input.uv + deltaU);
-                float3 dy = CalculatePositionVS(input.uv - deltaV) - CalculatePositionVS(input.uv + deltaV);
-                half3 n = cross(dy, dx);
+                // half depthX1 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv - deltaU);
+                // half depthX2 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv + deltaU);
+                // float3 tx = float3(1, depthX2 - depthX1, 0);
+                //
+                // half depthY1 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv - deltaV);
+                // half depthY2 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv + deltaV);
+                // float3 ty = float3(1, depthY2 - depthY1, 0);
+                //
+                // half3 n = cross(ty, tx);
 
+                float3 ddx = CalculatePositionVS(input.uv + deltaU) - CalculatePositionVS(input.uv - deltaU);
+                float3 ddy = CalculatePositionVS(input.uv + deltaV) - CalculatePositionVS(input.uv - deltaV);
+                half3 n = cross(ddy, ddx);
+                #if defined(UNITY_REVERSED_Z)
+                    n.z *= -1;
+                #endif
 
                 // half3 ddx = CalculatePositionVS(input.uv + deltaU) - pos;
                 // half3 ddx2 = pos - CalculatePositionVS(input.uv - deltaU);
@@ -143,7 +153,8 @@
                 n = normalize(n);
                 // n = TransformObjectToWorldNormal(n);
 
-                return half4(n, 1);
+                // return half4(n * 0.5 + 0.5, 1);
+                return half4(n * 0.5 + 0.5, 1);
             }
             ENDHLSL
 

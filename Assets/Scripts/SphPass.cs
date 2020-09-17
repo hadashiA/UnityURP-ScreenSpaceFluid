@@ -5,7 +5,7 @@ using UnityEngine.Rendering.Universal;
 public class SphPass : ScriptableRenderPass
 {
     readonly ProfilingSampler profilingSampler = new ProfilingSampler("Sph");
-    readonly ShaderTagId sphDepthShaderTagId = new ShaderTagId("SphDepth");
+    readonly ShaderTagId sphDepthShaderTagId = new ShaderTagId("BillboardSphereDepth");
 
     readonly Material material;
     readonly RenderTargetHandle sphDepthTargetHandle;
@@ -53,7 +53,7 @@ public class SphPass : ScriptableRenderPass
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
         var depthTargetDescriptor = cameraTextureDescriptor;
-        depthTargetDescriptor.colorFormat = RenderTextureFormat.RFloat;
+        depthTargetDescriptor.colorFormat = RenderTextureFormat.RHalf;
         depthTargetDescriptor.depthBufferBits = 1;
         depthTargetDescriptor.msaaSamples = 1;
 
