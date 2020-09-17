@@ -114,8 +114,6 @@ public class SphPass : ScriptableRenderPass
             cmd.ReleaseTemporaryRT(currentSource.id);
         }
 
-        cmd.SetGlobalTexture("_SphDepthTexture", currentDestination.id);
-
 
         // Draw normal
 
@@ -133,8 +131,9 @@ public class SphPass : ScriptableRenderPass
             frustomCornersBuffer[0].y, // bottom
             frustomCornersBuffer[1].y); // top
 
+        cmd.SetGlobalTexture("_SphDepthTexture", currentDestination.id);
         cmd.SetGlobalVector("_FrustumRect", frustumRect);
-        cmd.Blit(currentDestination.id, source, material, applySphPass);
+        cmd.Blit(source, source, material, applySphPass);
         // cmd.Blit(currentDestination.id, source);
 
         context.ExecuteCommandBuffer(cmd);

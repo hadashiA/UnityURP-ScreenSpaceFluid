@@ -67,7 +67,6 @@
             ZWrite On
             Cull Back
             ZTest On
-            // Blend SrcColor OneMinusSrcColor
 
             HLSLPROGRAM
 

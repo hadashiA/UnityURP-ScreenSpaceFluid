@@ -19,7 +19,9 @@ MonoBehaviour:
     LayerMask:
       serializedVersion: 2
       m_Bits: 256
-    BlurryIterations: 1
+    DepthThreshold: 0.001
+    DistortionStrength: 5
+    BlurryIterations: 4
     RenderQueueLowerBound: 0
     RenderQueueUpperBound: 5000
 --- !u!114 &11400000

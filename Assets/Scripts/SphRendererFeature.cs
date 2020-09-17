@@ -13,8 +13,12 @@ public class SphRendererFeature : ScriptableRendererFeature
 
         public LayerMask LayerMask;
 
-        [Range(0, 1)]
+        public Color Tint = Color.white;
+
+        [Range(0f, 0.1f)]
         public float DepthThreshold = 0.001f;
+
+        public float DistortionStrength = 1f;
 
         [Range(1, 16)]
         public int BlurryIterations = 1;
@@ -39,7 +43,9 @@ public class SphRendererFeature : ScriptableRendererFeature
 
         var sphMaterial = CoreUtils.CreateEngineMaterial(sphShader);
         sphMaterial.enableInstancing = true;
+        sphMaterial.SetColor("_Tint", settings.Tint);
         sphMaterial.SetFloat("_DepthThreshold", settings.DepthThreshold);
+        sphMaterial.SetFloat("_DistortionStrength", settings.DistortionStrength);
 
         var renderQueueRange = new RenderQueueRange(
             settings.RenderQueueLowerBound,

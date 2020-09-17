@@ -99,7 +99,9 @@
             #pragma vertex PassVertex
             #pragma fragment ApplySphPassFragment
 
+            uniform half4 _Tint;
             uniform half _DepthThreshold;
+            uniform half _DistortionStrength;
             uniform float4 _FrustumRect;
 
             uniform TEXTURE2D(_SphDepthTexture);
@@ -109,6 +111,7 @@
             float3 CalculatePositionVS(float2 uv)
             {
                 half depth = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, uv);
+                depth = LinearEyeDepth(depth, _ZBufferParams);
 
                 float3 ray = float3(
                     lerp(_FrustumRect[0], _FrustumRect[1], uv.x),
@@ -120,20 +123,13 @@
 
             half4 ApplySphPassFragment(Varyings input) : SV_Target
             {
+                // Calculate Normal
+
                 half depth = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv);
+                half enabled = depth > _DepthThreshold ? 1 : 0;
 
                 float2 deltaU = float2(_SphDepthTexture_TexelSize.x, 0);
                 float2 deltaV = float2(0, _SphDepthTexture_TexelSize.y);
-
-                // half depthX1 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv - deltaU);
-                // half depthX2 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv + deltaU);
-                // float3 tx = float3(1, depthX2 - depthX1, 0);
-                //
-                // half depthY1 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv - deltaV);
-                // half depthY2 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv + deltaV);
-                // float3 ty = float3(1, depthY2 - depthY1, 0);
-                //
-                // half3 n = cross(ty, tx);
 
                 float3 ddx = CalculatePositionVS(input.uv + deltaU) - CalculatePositionVS(input.uv - deltaU);
                 float3 ddy = CalculatePositionVS(input.uv + deltaV) - CalculatePositionVS(input.uv - deltaV);
@@ -142,20 +138,17 @@
                     n.z *= -1;
                 #endif
 
-                // half3 ddx = CalculatePositionVS(input.uv + deltaU) - pos;
-                // half3 ddx2 = pos - CalculatePositionVS(input.uv - deltaU);
-                // ddx = abs(ddx.z) > abs(ddx2.z) ? ddx2 : ddx;
-                //
-                // half3 ddy = CalculatePositionVS(input.uv + deltaV) - pos;
-                // half3 ddy2 = pos - CalculatePositionVS(input.uv - deltaV);
-                // ddy = abs(ddy.z) > abs(ddy2.z) ? ddy2 : ddy;
-                //
-                // half3 n = cross(ddy, ddx);
-                n = normalize(n);
-                n = depth < _DepthThreshold ? 0 : n;
+                n = normalize(n) * enabled;
+                // Rendering
+
+                half3 normalVS = normalize(mul((float3x3)UNITY_MATRIX_IT_MV, n));
+                half2 uvScreenOffset = (normalVS.xy * _DistortionStrength * _MainTex_TexelSize.xy) / _MainTex_TexelSize.xy;
+                // half2 uvScreenDistort = (uvScreenOffset * input.uv.z + input.uv.xy) / input.uv.w;
+                half2 uvScreenDistort = (uvScreenOffset + input.uv.xy);
+                half4 screen = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
 
                 // return half4(n * 0.5 + 0.5, 1);
-                return half4(n * 0.5 + 0.5, 1);
+                return lerp(screen, _Tint, enabled);
             }
             ENDHLSL
 
