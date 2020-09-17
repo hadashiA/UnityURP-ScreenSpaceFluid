@@ -2,7 +2,7 @@
 {
     Properties
     {
-        // _Radius("Sphere Radius", Float) = 1
+        _Radius("Sphere Radius", Float) = 1
     }
 
     SubShader
@@ -80,6 +80,8 @@
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
             // #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
+            uniform half _Radius;
+
             struct Attributes
             {
                 float4 positionOS : POSITION;
@@ -104,12 +106,12 @@
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
-                // mul(UNITY_MATRIX_MV, float4(0.0, 0.0, 0.0, 1.0))+ float4(input.vertex.x, input.vertex.y, 0.0, 0.0);
-                // output.pos = mul(UNITY_MATRIX_P, );
+                // 常にカメラを向く;
+                output.positionVS = mul(UNITY_MATRIX_MV, float4(0, 0, 0, 1))
+                    + float4(input.positionOS.x, input.positionOS.y, 0, 0)
+                    * float4(_Radius, _Radius, 1, 1);
 
-                output.positionVS = mul(UNITY_MATRIX_MV, float4(0, 0, 0, 1)) + float4(input.positionOS.x, input.positionOS.y, 0, 0);  // 常にカメラを向く;
 				output.positionCS = mul(UNITY_MATRIX_P, float4(output.positionVS.xyz, 1));
-				// output.positionCS = TransformObjectToHClip(input.positionOS);
 				output.uv = input.uv;
 				return output;
             }

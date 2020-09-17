@@ -19,8 +19,9 @@ MonoBehaviour:
     LayerMask:
       serializedVersion: 2
       m_Bits: 256
-    DepthThreshold: 0.001
-    DistortionStrength: 5
+    Tint: {r: 0.7146226, g: 0.91971946, b: 0.9528302, a: 0.54509807}
+    DepthThreshold: 0.0001
+    DistortionStrength: 0.02
     BlurryIterations: 4
     RenderQueueLowerBound: 0
     RenderQueueUpperBound: 5000
