@@ -50,7 +50,7 @@
             return s * 0.25f;
         }
 
-        Varyings PassVertex(Attributes input)
+        Varyings BlitPassVertex(Attributes input)
         {
             Varyings output = (Varyings)0;
 
@@ -66,7 +66,7 @@
             Name "DownSampling"
 
             HLSLPROGRAM
-            #pragma vertex PassVertex
+            #pragma vertex BlitPassVertex
             #pragma fragment DownSamplingPassFragment
 
             half4 DownSamplingPassFragment(Varyings input) : SV_Target
@@ -81,7 +81,7 @@
             Name "UpSampling"
 
             HLSLPROGRAM
-            #pragma vertex PassVertex
+            #pragma vertex BlitPassVertex
             #pragma fragment UpSamplingPassFragment
 
             half4 UpSamplingPassFragment(Varyings input) : SV_Target
@@ -96,7 +96,7 @@
             Name "ApplySph"
 
             HLSLPROGRAM
-            #pragma vertex PassVertex
+            #pragma vertex BlitPassVertex
             #pragma fragment ApplySphPassFragment
 
             uniform half4 _Tint;
@@ -107,6 +107,13 @@
             uniform TEXTURE2D(_SphDepthTexture);
             uniform SAMPLER(sampler_SphDepthTexture);
             uniform float4 _SphDepthTexture_TexelSize;
+
+            struct SphVaryings
+            {
+                float2 uv : TEXCOORD0;
+                float4 positionCS : SV_POSITION;
+                float4 uvScreen : TEXCOORD1;
+            };
 
             float3 CalculatePositionVS(float2 uv)
             {
@@ -120,6 +127,26 @@
 
                 return ray * depth;
             }
+
+    //         SphVaryings ApplySphPassVertex(Attributes input)
+    //         {
+    //             SphVaryings output = (SphVaryings)0;
+    //
+    //             float scale =
+    //                 #if UNITY_UV_STARTS_AT_TOP
+    // 				    -1.0;
+    //                 #else
+				//         1.0;
+    //                 #endif
+    //
+    //             VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
+    //             output.positionCS = vertexInput.positionCS;
+    //             output.uv = input.uv;
+    //             output.uvScreen.xy = (float2(vertexInput.positionCS.x, vertexInput.positionCS.y * scale) + vertexInput.positionCS.w) * 0.5;
+				// output.uvScreen.zw = vertexInput.positionCS.zw;
+    //
+    //             return output;
+    //         }
 
             half4 ApplySphPassFragment(Varyings input) : SV_Target
             {
@@ -139,16 +166,36 @@
                 #endif
 
                 n = normalize(n) * enabled;
-                // Rendering
 
-                half3 normalVS = normalize(mul((float3x3)UNITY_MATRIX_IT_MV, n));
-                half2 uvScreenOffset = (normalVS.xy * _DistortionStrength * _MainTex_TexelSize.xy) / _MainTex_TexelSize.xy;
-                // half2 uvScreenDistort = (uvScreenOffset * input.uv.z + input.uv.xy) / input.uv.w;
-                half2 uvScreenDistort = (uvScreenOffset + input.uv.xy);
-                half4 screen = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
+                // Lighting
 
-                // return half4(n * 0.5 + 0.5, 1);
-                return lerp(screen, _Tint, enabled);
+                half3 color = _Tint.rgb;
+
+                // rim
+
+                // half3 normalVS = normalize(mul((float3x3)UNITY_MATRIX_IT_MV, normalTS));
+                // float4 VdotN = dot(viewDir, normalVS);
+                // half4 colorRamp = SAMPLE_TEXTURE2D(TEXTURE2D_ARGS(_BubbleColorRamp, sampler_BubbleColorRamp), VdotN * flowNoise * _DistortionStrength);
+                // colorRamp = ApplyHSBCEffect(colorRamp, _BubbleHSBC);
+                // float4 bubbleRim = clamp(1 - pow(VdotN, _RimPower), 0,1);
+
+                // Specular
+
+
+
+                // Distortion
+
+                // half3 normalVS = normalize(mul((float3x3)UNITY_MATRIX_IT_MV, n));
+                // half2 uvScreenOffset = normalVS.xy * _DistortionStrength * _MainTex_TexelSize.xy;
+                // half2 uvScreenDistort = (uvScreenOffset * input.uvScreen.z + input.uv.xy) / input.uvScreen.w;
+                float2 uvScreenOffset = n.xy * _DistortionStrength;
+                float2 uvScreenDistort = input.uv + uvScreenOffset;
+                half4 screen = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uvScreenDistort);
+
+                // Lighting
+
+                color = lerp(screen.rgb, color, enabled * _Tint.a);
+                return half4(color, 1);
             }
             ENDHLSL
 
