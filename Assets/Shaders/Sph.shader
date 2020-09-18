@@ -99,22 +99,22 @@
             #pragma vertex ApplySphPassVertex
             #pragma fragment ApplySphPassFragment
 
+            uniform float4 _FrustumRect;
+            uniform half _DistortionStrength;
             uniform half4 _Tint;
             uniform half4 _AmbientColor;
             uniform half4 _SpecColor;
             uniform half _DepthThreshold;
-            uniform half _DistortionStrength;
-            uniform float4 _FrustumRect;
             uniform half _RimAmount;
             uniform half _RimThreshold;
             uniform half _Gloss;
+            uniform half4 _EdgeColor;
+            uniform half _EdgeScaleFactor;
+            uniform half _EdgeThreshold;
 
             uniform TEXTURE2D(_SphDepthTexture);
             uniform SAMPLER(sampler_SphDepthTexture);
             uniform float4 _SphDepthTexture_TexelSize;
-
-            uniform TEXTURE2D(_CameraDepthTexture);
-            uniform SAMPLER(sampler_CameraDepthTexture);
 
             struct SphVaryings
             {
@@ -136,16 +136,34 @@
                 return ray * depth;
             }
 
+            half4 EdgeDetection(float2 uv)
+            {
+                float halfScaleFloor = floor(_EdgeScaleFactor * 0.5);
+                float halfScaleCeil = ceil(_EdgeScaleFactor * 0.5);
+
+                float2 bottomLeftUV = uv - float2(_MainTex_TexelSize.x, _SphDepthTexture_TexelSize.y) * halfScaleFloor;
+                float2 topRightUV = uv + float2(_MainTex_TexelSize.x, _SphDepthTexture_TexelSize.y) * halfScaleCeil;
+                float2 bottomRightUV = uv + float2(_MainTex_TexelSize.x * halfScaleCeil, -_SphDepthTexture_TexelSize.y * halfScaleFloor);
+                float2 topLeftUV = uv + float2(-_MainTex_TexelSize.x * halfScaleFloor, _SphDepthTexture_TexelSize.y * halfScaleCeil);
+
+                half depth0 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, bottomLeftUV);
+                half depth1 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, topRightUV);
+                half depth2 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, bottomRightUV);
+                half depth3 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, topLeftUV);
+
+                half depthFiniteDifference0 = depth1 - depth0;
+                half depthFiniteDifference1 = depth3 - depth2;
+                half edgeDepth = sqrt(pow(depthFiniteDifference0, 2) + pow(depthFiniteDifference1, 2)) * 100;
+
+                // edgeDepth = step(_DepthThreshold, edgeDepth);
+                edgeDepth = edgeDepth > _EdgeThreshold ? 1 : 0;
+                half4 edgeColor = half4(_EdgeColor.rgb, _EdgeColor.a * edgeDepth);
+                return edgeDepth;
+            }
+
             SphVaryings ApplySphPassVertex(Attributes input)
             {
                 SphVaryings output = (SphVaryings)0;
-
-                float scale =
-                    #if UNITY_UV_STARTS_AT_TOP
-    				    -1.0;
-                    #else
-				        1.0;
-                    #endif
 
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
                 output.positionCS = vertexInput.positionCS;
@@ -166,53 +184,46 @@
                 float2 deltaU = float2(_SphDepthTexture_TexelSize.x, 0);
                 float2 deltaV = float2(0, _SphDepthTexture_TexelSize.y);
 
-                float3 ddx = CalculatePositionVS(input.uv + deltaU) - CalculatePositionVS(input.uv - deltaU);
-                float3 ddy = CalculatePositionVS(input.uv + deltaV) - CalculatePositionVS(input.uv - deltaV);
-                half3 n = -cross(ddy, ddx);
+                float3 ddx = (CalculatePositionVS(input.uv + deltaU) - CalculatePositionVS(input.uv - deltaU)) * 0.5;
+                float3 ddy = (CalculatePositionVS(input.uv + deltaV) - CalculatePositionVS(input.uv - deltaV)) * 0.5;
+                half3 n = cross(ddy, ddx);
                 n = normalize(n) * enabled;
-                #if UNITY_REVERSED_Z
-                    n *= -1;
-                #endif
 
+                // Calculate Lighting
 
-                // Lighting
-
-                // toon
-
+                // Diffuse
                 half nDotL = dot(_MainLightPosition.xyz, n);
                 float lightIntensity = smoothstep(0, 0.01, nDotL);
                 float4 light = lightIntensity * _MainLightColor;
 
-                // half3 normalVS = normalize(mul((float3x3)UNITY_MATRIX_IT_MV, n));
-                // float3 viewDir = normalize(input.viewDirWS);
-                // half vDotN = dot(viewDir, normalVS);
-    
-    //             float3 halfVector = normalize(_MainLightPosition.xyz + viewDir);
-    //             float nDotH = dot(halfVector, n);
-    //             float specularIntensity = pow(nDotH * lightIntensity, _Gloss * _Gloss);
-    //             float specularIntensitySmooth = smoothstep(0.005, 0.01, specularIntensity);
-    //             float4 specular = specularIntensitySmooth * _SpecColor;
-    //
-    //             float rimDot = 1 - dot(viewDir, n);
-				// float rimIntensity = rimDot * pow(nDotL, _RimThreshold);
-				// rimIntensity = smoothstep(_RimAmount - 0.01, _RimAmount + 0.01, rimIntensity);
-				// float4 rim = rimIntensity * _SpecColor;
+                // Specular
+                float3 viewDir = normalize(input.viewDirWS);
+                float3 halfVector = normalize(_MainLightPosition.xyz + viewDir);
+                float nDotH = dot(halfVector, n);
+                float specularIntensity = pow(nDotH * lightIntensity, _Gloss * _Gloss);
+                float specularIntensitySmooth = smoothstep(0.005, 0.01, specularIntensity);
+                float4 specular = specularIntensitySmooth * _SpecColor;
+
+                // Rim
+                float rimDot = 1 - dot(viewDir, n);
+				float rimIntensity = rimDot * pow(nDotL, _RimThreshold);
+				rimIntensity = smoothstep(_RimAmount - 0.01, _RimAmount + 0.01, rimIntensity);
+				float4 rim = rimIntensity * _SpecColor;
 
 
                 // Screen Distortion
-
-                // half3 normalVS = normalize(mul((float3x3)UNITY_MATRIX_IT_MV, n));
-                // half2 uvScreenOffset = normalVS.xy * _DistortionStrength * _MainTex_TexelSize.xy;
-                // half2 uvScreenDistort = (uvScreenOffset * input.uvScreen.z + input.uv.xy) / input.uvScreen.w;
                 float2 uvScreenOffset = n.xy * _DistortionStrength;
                 float2 uvScreenDistort = input.uv + uvScreenOffset;
                 half4 screen = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uvScreenDistort);
 
-                // Merge
+                // Edge Detection
+                // half4 edgeColor = EdgeDetection(input.uv) * enabled;
 
-                // half3 color = _Tint.rgb * (_AmbientColor + light + specular.rgb + rim);
-                half3 color = _Tint.rgb * (_AmbientColor + light);
+                // Merge
+                half3 color = _Tint.rgb * (_AmbientColor + light + specular.rgb + rim);
+                // half3 color = _Tint.rgb * (_AmbientColor + light);
                 color = lerp(screen.rgb, color, enabled * _Tint.a);
+                // color = lerp(color, edgeColor.rgb, edgeColor.a);
                 return half4(color, 1);
             }
             ENDHLSL

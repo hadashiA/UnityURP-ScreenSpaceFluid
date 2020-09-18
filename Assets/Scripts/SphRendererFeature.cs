@@ -32,6 +32,13 @@ public class SphRendererFeature : ScriptableRendererFeature
         [Range(1, 16)]
         public int BlurryIterations = 1;
 
+        public Color EdgeColor = Color.black;
+
+        public int EdgeScaleFactor = 2;
+
+        [Range(0f, 1f)]
+        public float EdgeThreshold = 0.2f;
+
         [Range(0, 5000)]
         public int RenderQueueLowerBound = 0;
 
@@ -60,6 +67,9 @@ public class SphRendererFeature : ScriptableRendererFeature
         sphMaterial.SetFloat("_RimThreshold", settings.RimThreshold);
         sphMaterial.SetFloat("_DepthThreshold", settings.DepthThreshold);
         sphMaterial.SetFloat("_DistortionStrength", settings.DistortionStrength);
+        sphMaterial.SetColor("_EdgeColor", settings.EdgeColor);
+        sphMaterial.SetInt("_EdgeScaleFactor", settings.EdgeScaleFactor);
+        sphMaterial.SetFloat("_EdgeThreshold", settings.EdgeThreshold);
 
         var renderQueueRange = new RenderQueueRange(
             settings.RenderQueueLowerBound,

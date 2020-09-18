@@ -54,8 +54,8 @@ public class SphPass : ScriptableRenderPass
     {
         var depthTargetDescriptor = cameraTextureDescriptor;
         depthTargetDescriptor.colorFormat = RenderTextureFormat.RFloat;
-        depthTargetDescriptor.depthBufferBits = 24;
-        depthTargetDescriptor.msaaSamples = 1;
+        depthTargetDescriptor.depthBufferBits = 0;
+        depthTargetDescriptor.msaaSamples = 2;
 
         cmd.GetTemporaryRT(sphDepthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
         ConfigureTarget(sphDepthTargetHandle.id);
@@ -81,8 +81,8 @@ public class SphPass : ScriptableRenderPass
 
         // Down sampling
         var blurringTargetDescriptor = renderingData.cameraData.cameraTargetDescriptor;
-        blurringTargetDescriptor.depthBufferBits = 24;
-        blurringTargetDescriptor.msaaSamples = 1;
+        blurringTargetDescriptor.depthBufferBits = 0;
+        blurringTargetDescriptor.msaaSamples = 2;
 
         var currentSource = sphDepthTargetHandle;
         var currentDestination = blurringTargetHandles[0];
@@ -114,9 +114,7 @@ public class SphPass : ScriptableRenderPass
             cmd.ReleaseTemporaryRT(currentSource.id);
         }
 
-
-        // Draw normal
-
+        // Draw
         // CalculateFrustumCorners returns bottom-left, top-left, top-right, bottom-right.
         var camera = renderingData.cameraData.camera;
         camera.CalculateFrustumCorners(
