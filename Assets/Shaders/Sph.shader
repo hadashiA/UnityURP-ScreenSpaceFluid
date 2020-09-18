@@ -96,13 +96,18 @@
             Name "ApplySph"
 
             HLSLPROGRAM
-            #pragma vertex BlitPassVertex
+            #pragma vertex ApplySphPassVertex
             #pragma fragment ApplySphPassFragment
 
             uniform half4 _Tint;
+            uniform half4 _AmbientColor;
+            uniform half4 _SpecColor;
             uniform half _DepthThreshold;
             uniform half _DistortionStrength;
             uniform float4 _FrustumRect;
+            uniform half _RimAmount;
+            uniform half _RimThreshold;
+            uniform half _Gloss;
 
             uniform TEXTURE2D(_SphDepthTexture);
             uniform SAMPLER(sampler_SphDepthTexture);
@@ -115,7 +120,7 @@
             {
                 float2 uv : TEXCOORD0;
                 float4 positionCS : SV_POSITION;
-                float4 uvScreen : TEXCOORD1;
+                float3 viewDirWS : TEXCOORD1;
             };
 
             float3 CalculatePositionVS(float2 uv)
@@ -131,27 +136,26 @@
                 return ray * depth;
             }
 
-    //         SphVaryings ApplySphPassVertex(Attributes input)
-    //         {
-    //             SphVaryings output = (SphVaryings)0;
-    //
-    //             float scale =
-    //                 #if UNITY_UV_STARTS_AT_TOP
-    // 				    -1.0;
-    //                 #else
-				//         1.0;
-    //                 #endif
-    //
-    //             VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
-    //             output.positionCS = vertexInput.positionCS;
-    //             output.uv = input.uv;
-    //             output.uvScreen.xy = (float2(vertexInput.positionCS.x, vertexInput.positionCS.y * scale) + vertexInput.positionCS.w) * 0.5;
-				// output.uvScreen.zw = vertexInput.positionCS.zw;
-    //
-    //             return output;
-    //         }
+            SphVaryings ApplySphPassVertex(Attributes input)
+            {
+                SphVaryings output = (SphVaryings)0;
 
-            half4 ApplySphPassFragment(Varyings input) : SV_Target
+                float scale =
+                    #if UNITY_UV_STARTS_AT_TOP
+    				    -1.0;
+                    #else
+				        1.0;
+                    #endif
+
+                VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
+                output.positionCS = vertexInput.positionCS;
+                output.uv = input.uv;
+                output.viewDirWS = GetCameraPositionWS() - vertexInput.positionWS;
+
+                return output;
+            }
+
+            half4 ApplySphPassFragment(SphVaryings input) : SV_Target
             {
                 // Calculate Normal
                 // half destDepth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, input.uv);
@@ -164,30 +168,38 @@
 
                 float3 ddx = CalculatePositionVS(input.uv + deltaU) - CalculatePositionVS(input.uv - deltaU);
                 float3 ddy = CalculatePositionVS(input.uv + deltaV) - CalculatePositionVS(input.uv - deltaV);
-                half3 n = cross(ddy, ddx);
-                #if defined(UNITY_REVERSED_Z)
-                    n.z *= -1;
+                half3 n = -cross(ddy, ddx);
+                n = normalize(n) * enabled;
+                #if UNITY_REVERSED_Z
+                    n *= -1;
                 #endif
 
-                n = normalize(n) * enabled;
 
                 // Lighting
 
-                half3 color = _Tint.rgb;
+                // toon
 
-                // rim
+                half nDotL = dot(_MainLightPosition.xyz, n);
+                float lightIntensity = smoothstep(0, 0.01, nDotL);
+                float4 light = lightIntensity * _MainLightColor;
 
-                // half3 normalVS = normalize(mul((float3x3)UNITY_MATRIX_IT_MV, normalTS));
-                // float4 VdotN = dot(viewDir, normalVS);
-                // half4 colorRamp = SAMPLE_TEXTURE2D(TEXTURE2D_ARGS(_BubbleColorRamp, sampler_BubbleColorRamp), VdotN * flowNoise * _DistortionStrength);
-                // colorRamp = ApplyHSBCEffect(colorRamp, _BubbleHSBC);
-                // float4 bubbleRim = clamp(1 - pow(VdotN, _RimPower), 0,1);
+                // half3 normalVS = normalize(mul((float3x3)UNITY_MATRIX_IT_MV, n));
+                // float3 viewDir = normalize(input.viewDirWS);
+                // half vDotN = dot(viewDir, normalVS);
+    
+    //             float3 halfVector = normalize(_MainLightPosition.xyz + viewDir);
+    //             float nDotH = dot(halfVector, n);
+    //             float specularIntensity = pow(nDotH * lightIntensity, _Gloss * _Gloss);
+    //             float specularIntensitySmooth = smoothstep(0.005, 0.01, specularIntensity);
+    //             float4 specular = specularIntensitySmooth * _SpecColor;
+    //
+    //             float rimDot = 1 - dot(viewDir, n);
+				// float rimIntensity = rimDot * pow(nDotL, _RimThreshold);
+				// rimIntensity = smoothstep(_RimAmount - 0.01, _RimAmount + 0.01, rimIntensity);
+				// float4 rim = rimIntensity * _SpecColor;
 
-                // Specular
 
-
-
-                // Distortion
+                // Screen Distortion
 
                 // half3 normalVS = normalize(mul((float3x3)UNITY_MATRIX_IT_MV, n));
                 // half2 uvScreenOffset = normalVS.xy * _DistortionStrength * _MainTex_TexelSize.xy;
@@ -196,8 +208,10 @@
                 float2 uvScreenDistort = input.uv + uvScreenOffset;
                 half4 screen = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uvScreenDistort);
 
-                // Lighting
+                // Merge
 
+                // half3 color = _Tint.rgb * (_AmbientColor + light + specular.rgb + rim);
+                half3 color = _Tint.rgb * (_AmbientColor + light);
                 color = lerp(screen.rgb, color, enabled * _Tint.a);
                 return half4(color, 1);
             }

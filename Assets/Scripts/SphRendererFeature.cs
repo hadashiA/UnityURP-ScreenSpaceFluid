@@ -14,6 +14,15 @@ public class SphRendererFeature : ScriptableRendererFeature
         public LayerMask LayerMask;
 
         public Color Tint = Color.white;
+        public Color AmbientColor = Color.white;
+        public Color SpecularColor = Color.white;
+        public float Glossiness = 2f;
+
+        [Range(0f, 1f)]
+        public float RimAmount = 0.7f;
+
+        [Range(0f, 1f)]
+        public float RimThreshold = 0.1f;
 
         [Range(0f, 0.1f)]
         public float DepthThreshold = 0.001f;
@@ -44,6 +53,11 @@ public class SphRendererFeature : ScriptableRendererFeature
         var sphMaterial = CoreUtils.CreateEngineMaterial(sphShader);
         sphMaterial.enableInstancing = true;
         sphMaterial.SetColor("_Tint", settings.Tint);
+        sphMaterial.SetColor("_AmbientColor", settings.AmbientColor);
+        sphMaterial.SetColor("_SpecColor", settings.SpecularColor);
+        sphMaterial.SetFloat("_Gloss", settings.Glossiness);
+        sphMaterial.SetFloat("_RimAmount", settings.RimAmount);
+        sphMaterial.SetFloat("_RimThreshold", settings.RimThreshold);
         sphMaterial.SetFloat("_DepthThreshold", settings.DepthThreshold);
         sphMaterial.SetFloat("_DistortionStrength", settings.DistortionStrength);
 
