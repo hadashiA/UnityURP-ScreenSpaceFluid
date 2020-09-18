@@ -12,7 +12,6 @@ public class SphPass : ScriptableRenderPass
     readonly Material material;
     readonly RenderTargetHandle sphDepthTargetHandle;
     readonly RenderTargetHandle[] blurringTargetHandles;
-    readonly Vector3[] frustomCornersBuffer = new Vector3[4];
 
     readonly int downSamplingPass;
     readonly int upSamplingPass;
@@ -115,22 +114,7 @@ public class SphPass : ScriptableRenderPass
         }
 
         // Draw
-        // CalculateFrustumCorners returns bottom-left, top-left, top-right, bottom-right.
-        var camera = renderingData.cameraData.camera;
-        camera.CalculateFrustumCorners(
-            new Rect(0f, 0f, 1f, 1f),
-            camera.farClipPlane,
-            camera.stereoActiveEye,
-            frustomCornersBuffer);
-
-        var frustumRect = new Vector4(
-            frustomCornersBuffer[0].x, // left
-            frustomCornersBuffer[2].x, // right
-            frustomCornersBuffer[0].y, // bottom
-            frustomCornersBuffer[1].y); // top
-
         cmd.SetGlobalTexture("_SphDepthTexture", currentDestination.id);
-        cmd.SetGlobalVector("_FrustumRect", frustumRect);
         cmd.Blit(source, source, material, applySphPass);
         // cmd.Blit(currentDestination.id, source);
 

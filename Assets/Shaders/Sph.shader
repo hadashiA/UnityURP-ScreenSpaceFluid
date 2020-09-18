@@ -99,7 +99,6 @@
             #pragma vertex ApplySphPassVertex
             #pragma fragment ApplySphPassFragment
 
-            uniform float4 _FrustumRect;
             uniform half _DistortionStrength;
             uniform half4 _Tint;
             uniform half4 _AmbientColor;
@@ -123,17 +122,13 @@
                 float3 viewDirWS : TEXCOORD1;
             };
 
-            float3 CalculatePositionVS(float2 uv)
+            float3 ReconstructPosition(float2 uv, float z)
             {
-                half depth = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, uv);
-                depth = LinearEyeDepth(depth, _ZBufferParams);
-
-                float3 ray = float3(
-                    lerp(_FrustumRect[0], _FrustumRect[1], uv.x),
-                    lerp(_FrustumRect[2], _FrustumRect[3], uv.y),
-                    _ProjectionParams.z);
-
-                return ray * depth;
+                float x = uv.x * 2.0f - 1.0f;
+                float y = (1.0 - uv.y) * 2.0f - 1.0f;
+                float4 screenPos = float4(x, y, z, 1.0f);
+                float4 positionVS = mul(UNITY_MATRIX_I_VP, screenPos);
+                return positionVS.xyz / positionVS.w;
             }
 
             half4 EdgeDetection(float2 uv)
@@ -189,10 +184,10 @@
                 // half3 n = cross(ddy, ddx);
                 // n = normalize(n) * enabled;
 
-                float3 positionVS = CalculatePositionVS(input.uv);
-                float3 n = cross(normalize(ddy(positionVS.xyz)), normalize(ddx(positionVS.xyz)));
+                // float3 positionVS = CalculatePositionVS(input.uv);
+                float3 p = ReconstructPosition(input.uv, depth);
+                float3 n = cross(normalize(ddy(p.xyz)), normalize(ddx(p.xyz)));
                 n *= enabled;
-
 
                 // Calculate Lighting
 
@@ -222,13 +217,13 @@
                 half4 screen = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uvScreenDistort);
 
                 // Edge Detection
-                // half4 edgeColor = EdgeDetection(input.uv) * enabled;
+                half4 edgeColor = EdgeDetection(input.uv) * enabled;
 
                 // Merge
                 half3 color = _Tint.rgb * (_AmbientColor + light + specular.rgb + rim);
                 // half3 color = _Tint.rgb * (_AmbientColor + light);
                 color = lerp(screen.rgb, color, enabled * _Tint.a);
-                // color = lerp(color, edgeColor.rgb, edgeColor.a);
+                color = lerp(color, edgeColor.rgb, edgeColor.a);
                 return half4(color, 1);
             }
             ENDHLSL
