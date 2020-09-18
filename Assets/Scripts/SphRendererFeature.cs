@@ -37,7 +37,10 @@ public class SphRendererFeature : ScriptableRendererFeature
         public int EdgeScaleFactor = 2;
 
         [Range(0f, 1f)]
-        public float EdgeThreshold = 0.2f;
+        public float EdgeDepthThreshold = 0.2f;
+
+        [Range(0f, 1f)]
+        public float EdgeNormalThreshold = 0.2f;
 
         [Range(0, 5000)]
         public int RenderQueueLowerBound = 0;
@@ -69,7 +72,8 @@ public class SphRendererFeature : ScriptableRendererFeature
         sphMaterial.SetFloat("_DistortionStrength", settings.DistortionStrength);
         sphMaterial.SetColor("_EdgeColor", settings.EdgeColor);
         sphMaterial.SetInt("_EdgeScaleFactor", settings.EdgeScaleFactor);
-        sphMaterial.SetFloat("_EdgeThreshold", settings.EdgeThreshold);
+        sphMaterial.SetFloat("_EdgeDepthThreshold", settings.EdgeDepthThreshold);
+        sphMaterial.SetFloat("_EdgeNormalThreshold", settings.EdgeNormalThreshold);
 
         var renderQueueRange = new RenderQueueRange(
             settings.RenderQueueLowerBound,

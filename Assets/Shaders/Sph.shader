@@ -93,11 +93,43 @@
 
         Pass
         {
-            Name "ApplySph"
+            Name "DepthNormal"
 
             HLSLPROGRAM
-            #pragma vertex ApplySphPassVertex
-            #pragma fragment ApplySphPassFragment
+            #pragma vertex BlitPassVertex
+            #pragma fragment DepthNormalPassFragment
+
+            uniform half _DepthThreshold;
+
+            float3 ReconstructPosition(float2 uv, float z)
+            {
+                float x = uv.x * 2.0f - 1.0f;
+                float y = (1.0 - uv.y) * 2.0f - 1.0f;
+                float4 screenPos = float4(x, y, z, 1.0f);
+                float4 positionVS = mul(UNITY_MATRIX_I_VP, screenPos);
+                return positionVS;
+            }
+
+            half4 DepthNormalPassFragment(Varyings input) : SV_Target
+            {
+                half depth = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, input.uv);
+                half enabled = depth > _DepthThreshold ? 1 : 0;
+
+                float3 p = ReconstructPosition(input.uv, depth);
+                float3 n = normalize(cross(ddy(p.xyz), ddx(p.xyz)));
+                n *= enabled;
+                return half4(n, depth);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "SphLit"
+
+            HLSLPROGRAM
+            #pragma vertex SphLitPassVertex
+            #pragma fragment SphLitPassFragment
 
             uniform half _DistortionStrength;
             uniform half4 _Tint;
@@ -109,13 +141,19 @@
             uniform half _Gloss;
             uniform half4 _EdgeColor;
             uniform half _EdgeScaleFactor;
-            uniform half _EdgeThreshold;
+            uniform half _EdgeDepthThreshold;
+            uniform half _EdgeNormalThreshold;
 
             uniform TEXTURE2D(_SphDepthTexture);
             uniform SAMPLER(sampler_SphDepthTexture);
             uniform float4 _SphDepthTexture_TexelSize;
 
-            struct SphVaryings
+            uniform TEXTURE2D(_SphNormalTexture);
+            uniform SAMPLER(sampler_SphNormalTexture);
+
+            uniform float4x4 _ClipToView;
+
+            struct SphLitVaryings
             {
                 float2 uv : TEXCOORD0;
                 float4 positionCS : SV_POSITION;
@@ -131,7 +169,7 @@
                 return positionVS.xyz / positionVS.w;
             }
 
-            half4 EdgeDetection(float2 uv)
+            half EdgeDetection(float2 uv, half enabled)
             {
                 float halfScaleFloor = floor(_EdgeScaleFactor * 0.5);
                 float halfScaleCeil = ceil(_EdgeScaleFactor * 0.5);
@@ -141,24 +179,36 @@
                 float2 bottomRightUV = uv + float2(_MainTex_TexelSize.x * halfScaleCeil, -_SphDepthTexture_TexelSize.y * halfScaleFloor);
                 float2 topLeftUV = uv + float2(-_MainTex_TexelSize.x * halfScaleFloor, _SphDepthTexture_TexelSize.y * halfScaleCeil);
 
-                half depth0 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, bottomLeftUV);
-                half depth1 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, topRightUV);
-                half depth2 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, bottomRightUV);
-                half depth3 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, topLeftUV);
+                half depth0 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, bottomLeftUV) * enabled;
+                half depth1 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, topRightUV) * enabled;
+                half depth2 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, bottomRightUV) * enabled;
+                half depth3 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, topLeftUV) * enabled;
 
                 half depthFiniteDifference0 = depth1 - depth0;
                 half depthFiniteDifference1 = depth3 - depth2;
                 half edgeDepth = sqrt(pow(depthFiniteDifference0, 2) + pow(depthFiniteDifference1, 2)) * 100;
+                float depthThreshold = _EdgeDepthThreshold * depth0;
+                edgeDepth = edgeDepth > depthThreshold ? 1 : 0;
+
+                float3 normal0 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, bottomLeftUV).rgb;
+                float3 normal1 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, topRightUV).rgb;
+                float3 normal2 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, bottomRightUV).rgb;
+                float3 normal3 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, topLeftUV).rgb;
+
+                float3 normalFiniteDifference0 = normal1 - normal0;
+                float3 normalFiniteDifference1 = normal3 - normal2;
+
+                float edgeNormal = sqrt(dot(normalFiniteDifference0, normalFiniteDifference0) + dot(normalFiniteDifference1, normalFiniteDifference1));
+                edgeNormal = edgeNormal > _EdgeNormalThreshold ? 1 : 0;
 
                 // edgeDepth = step(_DepthThreshold, edgeDepth);
-                edgeDepth = edgeDepth > _EdgeThreshold ? 1 : 0;
-                half4 edgeColor = half4(_EdgeColor.rgb, _EdgeColor.a * edgeDepth);
-                return edgeDepth;
+                // edgeDepth = edgeDepth > _EdgeThreshold ? 1 : 0;
+                return edgeNormal;
             }
 
-            SphVaryings ApplySphPassVertex(Attributes input)
+            SphLitVaryings SphLitPassVertex(Attributes input)
             {
-                SphVaryings output = (SphVaryings)0;
+                SphLitVaryings output = (SphLitVaryings)0;
 
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
                 output.positionCS = vertexInput.positionCS;
@@ -168,11 +218,13 @@
                 return output;
             }
 
-            half4 ApplySphPassFragment(SphVaryings input) : SV_Target
+            half4 SphLitPassFragment(SphLitVaryings input) : SV_Target
             {
                 // Calculate Normal
                 // half destDepth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, input.uv);
                 half depth = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv);
+                half3 n = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, input.uv);
+
                 // half enabled = depth > _DepthThreshold && depth < destDepth ? 1 : 0;
                 half enabled = depth > _DepthThreshold ? 1 : 0;
 
@@ -183,11 +235,6 @@
                 // float3 ddy = (CalculatePositionVS(input.uv + deltaV) - CalculatePositionVS(input.uv - deltaV)) * 0.5;
                 // half3 n = cross(ddy, ddx);
                 // n = normalize(n) * enabled;
-
-                // float3 positionVS = CalculatePositionVS(input.uv);
-                float3 p = ReconstructPosition(input.uv, depth);
-                float3 n = cross(normalize(ddy(p.xyz)), normalize(ddx(p.xyz)));
-                n *= enabled;
 
                 // Calculate Lighting
 
@@ -210,20 +257,19 @@
 				rimIntensity = smoothstep(_RimAmount - 0.01, _RimAmount + 0.01, rimIntensity);
 				float4 rim = rimIntensity * _SpecColor;
 
-
                 // Screen Distortion
                 float2 uvScreenOffset = n.xy * _DistortionStrength;
                 float2 uvScreenDistort = input.uv + uvScreenOffset;
                 half4 screen = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uvScreenDistort);
 
                 // Edge Detection
-                half4 edgeColor = EdgeDetection(input.uv) * enabled;
+                half edge = EdgeDetection(input.uv, enabled);
 
                 // Merge
                 half3 color = _Tint.rgb * (_AmbientColor + light + specular.rgb + rim);
                 // half3 color = _Tint.rgb * (_AmbientColor + light);
                 color = lerp(screen.rgb, color, enabled * _Tint.a);
-                color = lerp(color, edgeColor.rgb, edgeColor.a);
+                color = lerp(color, _EdgeColor.rgb, edge);
                 return half4(color, 1);
             }
             ENDHLSL

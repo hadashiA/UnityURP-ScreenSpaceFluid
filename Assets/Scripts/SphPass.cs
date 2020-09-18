@@ -10,12 +10,14 @@ public class SphPass : ScriptableRenderPass
     readonly ShaderTagId sphDepthShaderTagId = new ShaderTagId("BillboardSphereDepth");
 
     readonly Material material;
-    readonly RenderTargetHandle sphDepthTargetHandle;
+    readonly RenderTargetHandle depthTargetHandle;
+    readonly RenderTargetHandle normalTargetHandle;
     readonly RenderTargetHandle[] blurringTargetHandles;
 
     readonly int downSamplingPass;
     readonly int upSamplingPass;
-    readonly int applySphPass;
+    readonly int depthNormalPass;
+    readonly int litPass;
 
     RenderTargetIdentifier source;
     FilteringSettings filteringSettings;
@@ -37,11 +39,13 @@ public class SphPass : ScriptableRenderPass
             blurringTargetHandles[i].Init($"_BlurTemp{i}");
         }
 
-        sphDepthTargetHandle.Init("_SphDepthTexture");
+        depthTargetHandle.Init("_SphDepthTexture");
+        depthTargetHandle.Init("_SphNormalTexture");
 
         downSamplingPass = material.FindPass("DownSampling");
         upSamplingPass = material.FindPass("UpSampling");
-        applySphPass = material.FindPass("ApplySph");
+        depthNormalPass = material.FindPass("DepthNormal");
+        litPass = material.FindPass("SphLit");
     }
 
     public void SetUp(RenderTargetIdentifier source)
@@ -52,20 +56,26 @@ public class SphPass : ScriptableRenderPass
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
         var depthTargetDescriptor = cameraTextureDescriptor;
-        depthTargetDescriptor.colorFormat = RenderTextureFormat.RFloat;
+        depthTargetDescriptor.colorFormat = RenderTextureFormat.RHalf;
         depthTargetDescriptor.depthBufferBits = 0;
-        depthTargetDescriptor.msaaSamples = 2;
+        depthTargetDescriptor.msaaSamples = 1;
 
-        cmd.GetTemporaryRT(sphDepthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
-        ConfigureTarget(sphDepthTargetHandle.id);
+        cmd.GetTemporaryRT(depthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
+        ConfigureTarget(depthTargetHandle.id);
         ConfigureClear(ClearFlag.All, Color.black);
+
+        var normalTargetDescriptor = cameraTextureDescriptor;
+        normalTargetDescriptor.colorFormat = RenderTextureFormat.ARGB32;
+        normalTargetDescriptor.depthBufferBits = 0;
+        normalTargetDescriptor.msaaSamples = 1;
+        cmd.GetTemporaryRT(normalTargetHandle.id, normalTargetDescriptor, FilterMode.Point);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
     {
         var cmd = CommandBufferPool.Get(profilingSampler.name);
 
-        cmd.SetRenderTarget(sphDepthTargetHandle.id);
+        cmd.SetRenderTarget(depthTargetHandle.id);
         // cmd.ClearRenderTarget(true, true, Color.red, 1f);
 
         // Draw depth
@@ -81,9 +91,9 @@ public class SphPass : ScriptableRenderPass
         // Down sampling
         var blurringTargetDescriptor = renderingData.cameraData.cameraTargetDescriptor;
         blurringTargetDescriptor.depthBufferBits = 0;
-        blurringTargetDescriptor.msaaSamples = 2;
+        blurringTargetDescriptor.msaaSamples = 1;
 
-        var currentSource = sphDepthTargetHandle;
+        var currentSource = depthTargetHandle;
         var currentDestination = blurringTargetHandles[0];
 
         blurringTargetDescriptor.width /= 2;
@@ -113,10 +123,16 @@ public class SphPass : ScriptableRenderPass
             cmd.ReleaseTemporaryRT(currentSource.id);
         }
 
-        // Draw
+        // Draw Normal
         cmd.SetGlobalTexture("_SphDepthTexture", currentDestination.id);
-        cmd.Blit(source, source, material, applySphPass);
-        // cmd.Blit(currentDestination.id, source);
+        cmd.Blit(currentDestination.id, normalTargetHandle.id, material, depthNormalPass);
+
+        // Lighting
+
+        var clipToView = GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, true).inverse;
+        cmd.SetGlobalMatrix("_ClipToView", clipToView);
+        cmd.SetGlobalTexture("_SphNormalTexture", normalTargetHandle.id);
+        cmd.Blit(source, source, material, litPass);
 
         // cmd.SetRenderTarget(source);
         // cmd.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
@@ -129,7 +145,7 @@ public class SphPass : ScriptableRenderPass
 
     public override void FrameCleanup(CommandBuffer cmd)
     {
-        cmd.ReleaseTemporaryRT(sphDepthTargetHandle.id);
+        cmd.ReleaseTemporaryRT(depthTargetHandle.id);
         foreach (var targetHandle in blurringTargetHandles)
         {
             cmd.ReleaseTemporaryRT(targetHandle.id);

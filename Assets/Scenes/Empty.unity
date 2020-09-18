@@ -374,7 +374,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   elementPrefab: {fileID: 1099760884, guid: fd39e28b88511469ca0f1b44cf22a35f, type: 3}
-  lifetime: 10
+  lifetime: 15
   spawnDuration: 0.1
 --- !u!4 &347584342
 Transform:
