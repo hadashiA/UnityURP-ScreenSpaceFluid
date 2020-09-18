@@ -181,13 +181,18 @@
                 // half enabled = depth > _DepthThreshold && depth < destDepth ? 1 : 0;
                 half enabled = depth > _DepthThreshold ? 1 : 0;
 
-                float2 deltaU = float2(_SphDepthTexture_TexelSize.x, 0);
-                float2 deltaV = float2(0, _SphDepthTexture_TexelSize.y);
+                // float2 deltaU = float2(_SphDepthTexture_TexelSize.x, 0);
+                // float2 deltaV = float2(0, _SphDepthTexture_TexelSize.y);
+                //
+                // float3 ddx = (CalculatePositionVS(input.uv + deltaU) - CalculatePositionVS(input.uv - deltaU)) * 0.5;
+                // float3 ddy = (CalculatePositionVS(input.uv + deltaV) - CalculatePositionVS(input.uv - deltaV)) * 0.5;
+                // half3 n = cross(ddy, ddx);
+                // n = normalize(n) * enabled;
 
-                float3 ddx = (CalculatePositionVS(input.uv + deltaU) - CalculatePositionVS(input.uv - deltaU)) * 0.5;
-                float3 ddy = (CalculatePositionVS(input.uv + deltaV) - CalculatePositionVS(input.uv - deltaV)) * 0.5;
-                half3 n = cross(ddy, ddx);
-                n = normalize(n) * enabled;
+                float3 positionVS = CalculatePositionVS(input.uv);
+                float3 n = cross(normalize(ddy(positionVS.xyz)), normalize(ddx(positionVS.xyz)));
+                n *= enabled;
+
 
                 // Calculate Lighting
 
