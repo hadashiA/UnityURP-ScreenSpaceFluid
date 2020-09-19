@@ -122,25 +122,25 @@
                 half depth = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, input.uv);
                 half enabled = depth > _DepthThreshold ? 1 : 0;
 
-                // float3 pos = ReconstructPosition(input.uv, depth);
-                //
-                // half2 offsetU = half2(_MainTex_TexelSize.x, 0);
-                // half2 offsetV = half2(0, _MainTex_TexelSize.y);
-                //
-                // float3 ddx = ReconstructPosition(input.uv + offsetU) - pos;
-                // float3 ddx2 = pos - ReconstructPosition(input.uv - offsetU);
-                // ddx = abs(ddx.z) > abs(ddx2.z) ? ddx2 : ddx;
-                //
-                // float3 ddy = ReconstructPosition(input.uv + offsetV) - pos;
-                // float3 ddy2 = pos - ReconstructPosition(input.uv - offsetV);
-                // ddy = abs(ddy.z) > abs(ddy2.z) ? ddy2 : ddy;
+                float3 pos = ReconstructPosition(input.uv, depth);
 
-                // float3 n = normalize(cross(ddy, ddx));
+                half2 offsetU = half2(_MainTex_TexelSize.x, 0);
+                half2 offsetV = half2(0, _MainTex_TexelSize.y);
 
-                float3 p = ReconstructPosition(input.uv, depth);
-                float3 n = normalize(cross(ddy(p.xyz), ddx(p.xyz)));
+                float3 ddx = ReconstructPosition(input.uv + offsetU) - pos;
+                float3 ddx2 = pos - ReconstructPosition(input.uv - offsetU);
+                ddx = abs(ddx.z) > abs(ddx2.z) ? ddx2 : ddx;
+
+                float3 ddy = ReconstructPosition(input.uv + offsetV) - pos;
+                float3 ddy2 = pos - ReconstructPosition(input.uv - offsetV);
+                ddy = abs(ddy.z) > abs(ddy2.z) ? ddy2 : ddy;
+
+                float3 n = normalize(cross(ddy, ddx));
+
+                // float3 p = ReconstructPosition(input.uv, depth);
+                // float3 n = normalize(cross(ddy(p.xyz), ddx(p.xyz)));
                 n *= enabled;
-                return half4(n, depth);
+                return half4(n * 0.5 + 0.5, depth);
             }
             ENDHLSL
         }
@@ -181,15 +181,6 @@
                 float4 positionCS : SV_POSITION;
                 float3 viewDirWS : TEXCOORD1;
             };
-
-            float3 ReconstructPosition(float2 uv, float z)
-            {
-                float x = uv.x * 2.0f - 1.0f;
-                float y = (1.0 - uv.y) * 2.0f - 1.0f;
-                float4 screenPos = float4(x, y, z, 1.0f);
-                float4 positionVS = mul(UNITY_MATRIX_I_VP, screenPos);
-                return positionVS.xyz / positionVS.w;
-            }
 
             half EdgeDetection(float2 uv, half enabled)
             {
@@ -246,17 +237,10 @@
                 // half destDepth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, input.uv);
                 half depth = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv);
                 half3 n = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, input.uv).rgb;
+                n = n * 2 - 1; // decode
 
                 // half enabled = depth > _DepthThreshold && depth < destDepth ? 1 : 0;
                 half enabled = depth > _DepthThreshold ? 1 : 0;
-
-                // float2 deltaU = float2(_SphDepthTexture_TexelSize.x, 0);
-                // float2 deltaV = float2(0, _SphDepthTexture_TexelSize.y);
-                //
-                // float3 ddx = (CalculatePositionVS(input.uv + deltaU) - CalculatePositionVS(input.uv - deltaU)) * 0.5;
-                // float3 ddy = (CalculatePositionVS(input.uv + deltaV) - CalculatePositionVS(input.uv - deltaV)) * 0.5;
-                // half3 n = cross(ddy, ddx);
-                // n = normalize(n) * enabled;
 
                 // Calculate Lighting
 
@@ -289,13 +273,11 @@
 
                 // Merge
                 half3 color = _Tint.rgb * (_AmbientColor + light + specular.rgb + rim);
-                // half3 color = _Tint.rgb * (_AmbientColor + light);
                 color = lerp(screen.rgb, color, enabled * _Tint.a);
                 color = lerp(color, _EdgeColor.rgb, edge);
                 return half4(color, 1);
             }
             ENDHLSL
-
         }
     }
 }
