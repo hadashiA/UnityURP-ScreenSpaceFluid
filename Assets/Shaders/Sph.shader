@@ -99,21 +99,43 @@
             #pragma vertex BlitPassVertex
             #pragma fragment DepthNormalPassFragment
 
+            uniform float4x4 _MatrixHClipToWorld;
             uniform half _DepthThreshold;
 
-            float3 ReconstructPosition(float2 uv, float z)
+            float3 ReconstructPosition(float2 uv, float depth)
             {
                 float x = uv.x * 2.0f - 1.0f;
                 float y = (1.0 - uv.y) * 2.0f - 1.0f;
-                float4 screenPos = float4(x, y, z, 1.0f);
-                float4 positionVS = mul(UNITY_MATRIX_I_VP, screenPos);
-                return positionVS;
+                float4 positionCS = float4(x, y, depth, 1.0f) * LinearEyeDepth(depth, _ZBufferParams);
+                return mul(UNITY_MATRIX_I_VP, positionCS);
+                // return mul(_MatrixHClipToWorld, positionCS);
+            }
+
+            float3 ReconstructPosition(float2 uv)
+            {
+                float depth = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, uv);
+                return ReconstructPosition(uv, depth);
             }
 
             half4 DepthNormalPassFragment(Varyings input) : SV_Target
             {
                 half depth = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, input.uv);
                 half enabled = depth > _DepthThreshold ? 1 : 0;
+
+                // float3 pos = ReconstructPosition(input.uv, depth);
+                //
+                // half2 offsetU = half2(_MainTex_TexelSize.x, 0);
+                // half2 offsetV = half2(0, _MainTex_TexelSize.y);
+                //
+                // float3 ddx = ReconstructPosition(input.uv + offsetU) - pos;
+                // float3 ddx2 = pos - ReconstructPosition(input.uv - offsetU);
+                // ddx = abs(ddx.z) > abs(ddx2.z) ? ddx2 : ddx;
+                //
+                // float3 ddy = ReconstructPosition(input.uv + offsetV) - pos;
+                // float3 ddy2 = pos - ReconstructPosition(input.uv - offsetV);
+                // ddy = abs(ddy.z) > abs(ddy2.z) ? ddy2 : ddy;
+
+                // float3 n = normalize(cross(ddy, ddx));
 
                 float3 p = ReconstructPosition(input.uv, depth);
                 float3 n = normalize(cross(ddy(p.xyz), ddx(p.xyz)));
@@ -190,10 +212,10 @@
                 float depthThreshold = _EdgeDepthThreshold * depth0;
                 edgeDepth = edgeDepth > depthThreshold ? 1 : 0;
 
-                float3 normal0 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, bottomLeftUV).rgb;
-                float3 normal1 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, topRightUV).rgb;
-                float3 normal2 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, bottomRightUV).rgb;
-                float3 normal3 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, topLeftUV).rgb;
+                float3 normal0 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, bottomLeftUV).rgb * enabled;
+                float3 normal1 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, topRightUV).rgb * enabled;
+                float3 normal2 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, bottomRightUV).rgb * enabled;
+                float3 normal3 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, topLeftUV).rgb * enabled;
 
                 float3 normalFiniteDifference0 = normal1 - normal0;
                 float3 normalFiniteDifference1 = normal3 - normal2;
@@ -223,7 +245,7 @@
                 // Calculate Normal
                 // half destDepth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, input.uv);
                 half depth = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv);
-                half3 n = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, input.uv);
+                half3 n = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, input.uv).rgb;
 
                 // half enabled = depth > _DepthThreshold && depth < destDepth ? 1 : 0;
                 half enabled = depth > _DepthThreshold ? 1 : 0;

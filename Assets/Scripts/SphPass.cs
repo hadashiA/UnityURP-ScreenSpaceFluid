@@ -124,6 +124,11 @@ public class SphPass : ScriptableRenderPass
         }
 
         // Draw Normal
+        var camera = renderingData.cameraData.camera;
+        var matrixCameraToWorld = camera.cameraToWorldMatrix;
+        var matrixProjectionInverse = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
+        var matrixHClipToWorld = matrixCameraToWorld * matrixProjectionInverse;
+        cmd.SetGlobalMatrix("_MatrixHClipToWorld", matrixHClipToWorld);
         cmd.SetGlobalTexture("_SphDepthTexture", currentDestination.id);
         cmd.Blit(currentDestination.id, normalTargetHandle.id, material, depthNormalPass);
 
