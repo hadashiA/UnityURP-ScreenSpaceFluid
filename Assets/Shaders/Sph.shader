@@ -137,6 +137,9 @@
 
                 float3 p = ReconstructPosition(input.uv, depth);
                 float3 n = normalize(cross(ddy(p.xyz), ddx(p.xyz)));
+                #if defined(UNITY_REVERSED_Z)
+                    n.z = -n.z;
+                #endif
                 n *= enabled;
                 return half4(n * 0.5 + 0.5, depth);
             }
@@ -199,10 +202,10 @@
 
                 float depthDifference1 = depth2 - depth1;
                 float depthDifference2 = depth4 - depth3;
-                float edgeDepth = sqrt(dot(depthDifference1, depthDifference1) + dot(depthDifference2, depthDifference2)) * 100 * enabled;
+                float edgeDepth = sqrt(dot(depthDifference1, depthDifference1) + dot(depthDifference2, depthDifference2)) * 10 * enabled;
                 edgeDepth = edgeDepth > _EdgeDepthThreshold ? 1 : 0;
 
-                return edgeNormal * edgeDepth;
+                return edgeDepth * edgeNormal;
             }
 
             SphLitVaryings SphLitPassVertex(Attributes input)
