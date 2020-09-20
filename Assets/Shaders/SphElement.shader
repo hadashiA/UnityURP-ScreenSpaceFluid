@@ -11,8 +11,8 @@
 
         Pass
         {
-            Name "VertexDepth"
-            Tags { "LightMode" = "VertexDepth" }
+            Name "SphVertexDepth"
+            Tags { "LightMode" = "SphVertexDepth" }
 
             HLSLPROGRAM
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -50,9 +50,7 @@
             half4 DepthOnlyFragment(Varyings input) : SV_TARGET
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-                // half depth = UNITY_Z_0_FAR_FROM_CLIPSPACE(input.positionCS.z);
                 half depth = input.positionCS.z;
-                // depth = Linear01Depth(depth, _ZBufferParams);
                 return depth;
             }
             ENDHLSL
@@ -60,9 +58,9 @@
 
         Pass
         {
-            Name "BillboardSphereDepth"
-            Tags { "LightMode" = "BillboardSphereDepth" }
+            Name "SphBillboardSphereDepth"
             // Tags { "LightMode" = "UniversalForward" }
+            Tags { "LightMode" = "SphBillboardSphereDepth" }
 
             ZWrite On
             Cull Back
@@ -109,7 +107,7 @@
                 // 常にカメラを向く;
                 output.positionVS = mul(UNITY_MATRIX_MV, float4(0, 0, 0, 1))
                     + float4(input.positionOS.x, input.positionOS.y, 0, 0)
-                    * float4(_Radius, _Radius, 1, 1);
+                    * float4(_Radius * 2, _Radius * 2, 1, 1);
 
 				output.positionCS = mul(UNITY_MATRIX_P, float4(output.positionVS.xyz, 1));
 				output.uv = input.uv;
@@ -135,7 +133,6 @@
                 float4 positionCS = TransformWViewToHClip(positionVS);
 
                 half depth = positionCS.z / positionCS.w;
-
                 return depth;
             }
             ENDHLSL

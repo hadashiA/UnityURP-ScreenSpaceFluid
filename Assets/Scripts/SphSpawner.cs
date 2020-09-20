@@ -45,9 +45,9 @@ public class SphSpawner : MonoBehaviour
 
         element.transform.SetParent(transform, false);
         element.transform.localPosition = new Vector3(
-                UnityEngine.Random.Range(-0.1f, 0.1f),
-                UnityEngine.Random.Range(-0.1f, 0.1f),
-                UnityEngine.Random.Range(-0.1f, 0.1f));
+                UnityEngine.Random.Range(-0.25f, 0.25f),
+                UnityEngine.Random.Range(-0.25f, 0.25f),
+                UnityEngine.Random.Range(-0.25f, 0.25f));
 
         var force = new Vector3(
             UnityEngine.Random.Range(-10f, 10f),

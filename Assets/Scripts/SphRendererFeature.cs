@@ -29,7 +29,7 @@ public class SphRendererFeature : ScriptableRendererFeature
 
         public float DistortionStrength = 1f;
 
-        [Range(1, 16)]
+        [Range(0, 16)]
         public int BlurryIterations = 1;
 
         public Color EdgeColor = Color.black;

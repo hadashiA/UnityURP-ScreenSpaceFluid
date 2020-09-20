@@ -25,13 +25,13 @@ MonoBehaviour:
     Glossiness: 28
     RimAmount: 0.7
     RimThreshold: 0.1
-    DepthThreshold: 0.001
+    DepthThreshold: 0.0005
     DistortionStrength: 0.02
-    BlurryIterations: 4
+    BlurryIterations: 3
     EdgeColor: {r: 1, g: 1, b: 1, a: 1}
-    EdgeScaleFactor: 2
-    EdgeDepthThreshold: 0.226
-    EdgeNormalThreshold: 0.652
+    EdgeScaleFactor: 4
+    EdgeDepthThreshold: 0.05
+    EdgeNormalThreshold: 0.434
     RenderQueueLowerBound: 0
     RenderQueueUpperBound: 5000
 --- !u!114 &11400000

@@ -7,7 +7,7 @@ public class SphPass : ScriptableRenderPass
     int BlurringIterations => blurringTargetHandles.Length;
 
     readonly ProfilingSampler profilingSampler = new ProfilingSampler("Sph");
-    readonly ShaderTagId sphDepthShaderTagId = new ShaderTagId("BillboardSphereDepth");
+    readonly ShaderTagId sphDepthShaderTagId = new ShaderTagId("SphBillboardSphereDepth");
 
     readonly Material material;
     readonly RenderTargetHandle depthTargetHandle;
@@ -89,39 +89,43 @@ public class SphPass : ScriptableRenderPass
         // Blurring
 
         // Down sampling
-        var blurringTargetDescriptor = renderingData.cameraData.cameraTargetDescriptor;
-        blurringTargetDescriptor.depthBufferBits = 32;
-        blurringTargetDescriptor.msaaSamples = 4;
-
-        var currentSource = depthTargetHandle;
-        var currentDestination = blurringTargetHandles[0];
-
-        for (var i = 0; i < BlurringIterations; i++)
+        if (BlurringIterations > 0)
         {
-            blurringTargetDescriptor.width /= 2;
-            blurringTargetDescriptor.height /= 2;
-            cmd.GetTemporaryRT(currentDestination.id, blurringTargetDescriptor, FilterMode.Bilinear);
-            cmd.Blit(currentSource.id, currentDestination.id, material, downSamplingPass);
+            var blurringTargetDescriptor = renderingData.cameraData.cameraTargetDescriptor;
+            blurringTargetDescriptor.depthBufferBits = 32;
+            blurringTargetDescriptor.msaaSamples = 4;
 
-            if (i < BlurringIterations - 1)
+            var currentSource = depthTargetHandle;
+            var currentDestination = blurringTargetHandles[0];
+
+            for (var i = 0; i < BlurringIterations; i++)
+            {
+                blurringTargetDescriptor.width /= 2;
+                blurringTargetDescriptor.height /= 2;
+                cmd.GetTemporaryRT(currentDestination.id, blurringTargetDescriptor, FilterMode.Bilinear);
+                cmd.Blit(currentSource.id, currentDestination.id, material, downSamplingPass);
+
+                if (i < BlurringIterations - 1)
+                {
+                    currentSource = currentDestination;
+                    currentDestination = blurringTargetHandles[i];
+                }
+            }
+
+            // Up sampling
+            for (var i = BlurringIterations - 2; i >= 0; i--)
             {
                 currentSource = currentDestination;
                 currentDestination = blurringTargetHandles[i];
+
+                cmd.Blit(currentSource.id, currentDestination.id, material, upSamplingPass);
             }
+
+            cmd.Blit(currentDestination.id, depthTargetHandle.id, material, upSamplingPass);
         }
-
-        // Up sampling
-        for (var i = BlurringIterations - 2; i >= 0; i--)
-        {
-            currentSource = currentDestination;
-            currentDestination = blurringTargetHandles[i];
-
-            cmd.Blit(currentSource.id, currentDestination.id, material, upSamplingPass);
-        }
-
-        cmd.Blit(currentDestination.id, depthTargetHandle.id, material, upSamplingPass);
 
         // Draw Normal
+
         var camera = renderingData.cameraData.camera;
         var matrixCameraToWorld = camera.cameraToWorldMatrix;
         var matrixProjectionInverse = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
@@ -132,8 +136,8 @@ public class SphPass : ScriptableRenderPass
 
         // Lighting
 
-        // var clipToView = GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, true).inverse;
-        // cmd.SetGlobalMatrix("_ClipToView", clipToView);
+        var clipToView = GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, true).inverse;
+        cmd.SetGlobalMatrix("_MatrixClipToView", clipToView);
         cmd.SetGlobalTexture("_SphNormalTexture", normalTargetHandle.id);
         cmd.Blit(source, source, material, litPass);
 

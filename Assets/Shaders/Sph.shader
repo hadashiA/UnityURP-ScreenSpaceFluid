@@ -99,7 +99,6 @@
             #pragma vertex BlitPassVertex
             #pragma fragment DepthNormalPassFragment
 
-            uniform float4x4 _MatrixHClipToWorld;
             uniform half _DepthThreshold;
 
             float3 ReconstructPosition(float2 uv, float depth)
@@ -108,7 +107,6 @@
                 float y = (1.0 - uv.y) * 2.0f - 1.0f;
                 float4 positionCS = float4(x, y, depth, 1.0f) * LinearEyeDepth(depth, _ZBufferParams);
                 return mul(UNITY_MATRIX_I_VP, positionCS);
-                // return mul(_MatrixHClipToWorld, positionCS);
             }
 
             float3 ReconstructPosition(float2 uv)
@@ -173,49 +171,37 @@
             uniform TEXTURE2D(_SphNormalTexture);
             uniform SAMPLER(sampler_SphNormalTexture);
 
-            uniform float4x4 _ClipToView;
+            uniform float4x4 _MatrixClipToView;
 
             struct SphLitVaryings
             {
-                float2 uv : TEXCOORD0;
+                float2 uv[5] : TEXCOORD0;
                 float4 positionCS : SV_POSITION;
-                float3 viewDirWS : TEXCOORD1;
+                float3 viewDirWS : TEXCOORD5;
             };
 
-            half EdgeDetection(float2 uv, half enabled)
+            half EdgeDetection(float2 uv[5], half enabled)
             {
-                float halfScaleFloor = floor(_EdgeScaleFactor * 0.5);
-                float halfScaleCeil = ceil(_EdgeScaleFactor * 0.5);
+                float3 normal1 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[1]).rgb * enabled;
+                float3 normal2 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[2]).rgb * enabled;
+                float3 normal3 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[3]).rgb * enabled;
+                float3 normal4 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[4]).rgb * enabled;
 
-                float2 bottomLeftUV = uv - float2(_MainTex_TexelSize.x, _SphDepthTexture_TexelSize.y) * halfScaleFloor;
-                float2 topRightUV = uv + float2(_MainTex_TexelSize.x, _SphDepthTexture_TexelSize.y) * halfScaleCeil;
-                float2 bottomRightUV = uv + float2(_MainTex_TexelSize.x * halfScaleCeil, -_SphDepthTexture_TexelSize.y * halfScaleFloor);
-                float2 topLeftUV = uv + float2(-_MainTex_TexelSize.x * halfScaleFloor, _SphDepthTexture_TexelSize.y * halfScaleCeil);
-
-                half depth0 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, bottomLeftUV) * enabled;
-                half depth1 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, topRightUV) * enabled;
-                half depth2 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, bottomRightUV) * enabled;
-                half depth3 = SAMPLE_TEXTURE2D(_SphDepthTexture, sampler_SphDepthTexture, topLeftUV) * enabled;
-
-                half depthFiniteDifference0 = depth1 - depth0;
-                half depthFiniteDifference1 = depth3 - depth2;
-                half edgeDepth = sqrt(pow(depthFiniteDifference0, 2) + pow(depthFiniteDifference1, 2)) * 100;
-                float depthThreshold = _EdgeDepthThreshold * depth0;
-                edgeDepth = edgeDepth > depthThreshold ? 1 : 0;
-
-                float3 normal0 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, bottomLeftUV).rgb * enabled;
-                float3 normal1 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, topRightUV).rgb * enabled;
-                float3 normal2 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, bottomRightUV).rgb * enabled;
-                float3 normal3 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, topLeftUV).rgb * enabled;
-
-                float3 normalFiniteDifference0 = normal1 - normal0;
-                float3 normalFiniteDifference1 = normal3 - normal2;
-
-                float edgeNormal = sqrt(dot(normalFiniteDifference0, normalFiniteDifference0) + dot(normalFiniteDifference1, normalFiniteDifference1));
+                float3 normalDifference1 = normal2 - normal1;
+                float3 normalDifference2 = normal4 - normal3;
+                float edgeNormal = sqrt(dot(normalDifference1, normalDifference1) + dot(normalDifference2, normalDifference2));
                 edgeNormal = edgeNormal > _EdgeNormalThreshold ? 1 : 0;
 
-                // edgeDepth = step(_DepthThreshold, edgeDepth);
-                // edgeDepth = edgeDepth > _EdgeThreshold ? 1 : 0;
+                float depth1 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, uv[1]) * enabled;
+                float depth2 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, uv[2]) * enabled;
+                float depth3 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, uv[3]) * enabled;
+                float depth4 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, uv[4]) * enabled;
+
+                float depthDifference1 = depth2 - depth1;
+                float depthDifference2 = depth4 - depth3;
+                float edgeDepth = sqrt(dot(depthDifference1, depthDifference1) + dot(depthDifference2, depthDifference2)) * 100 * enabled;
+                edgeDepth = edgeDepth > _EdgeDepthThreshold ? 1 : 0;
+
                 return edgeNormal;
             }
 
@@ -225,8 +211,13 @@
 
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
                 output.positionCS = vertexInput.positionCS;
-                output.uv = input.uv;
                 output.viewDirWS = GetCameraPositionWS() - vertexInput.positionWS;
+
+                output.uv[0] = input.uv;
+                output.uv[1] = input.uv + _MainTex_TexelSize.xy * half2( 1, 1) * _EdgeScaleFactor;
+                output.uv[2] = input.uv + _MainTex_TexelSize.xy * half2(-1,-1) * _EdgeScaleFactor;
+                output.uv[3] = input.uv + _MainTex_TexelSize.xy * half2(-1, 1) * _EdgeScaleFactor;
+                output.uv[4] = input.uv + _MainTex_TexelSize.xy * half2( 1,-1) * _EdgeScaleFactor;
 
                 return output;
             }
@@ -235,8 +226,9 @@
             {
                 // Calculate Normal
                 // half destDepth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, input.uv);
-                half depth = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, input.uv);
-                half3 n = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, input.uv).rgb;
+                float2 uv = input.uv[0];
+                half depth = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, uv);
+                half3 n = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv).rgb;
                 n = n * 2 - 1; // decode
 
                 // half enabled = depth > _DepthThreshold && depth < destDepth ? 1 : 0;
@@ -265,7 +257,7 @@
 
                 // Screen Distortion
                 float2 uvScreenOffset = n.xy * _DistortionStrength;
-                float2 uvScreenDistort = input.uv + uvScreenOffset;
+                float2 uvScreenDistort = uv + uvScreenOffset;
                 half4 screen = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uvScreenDistort);
 
                 // Edge Detection
