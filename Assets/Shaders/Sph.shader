@@ -120,23 +120,23 @@
                 half depth = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, input.uv);
                 half enabled = depth > _DepthThreshold ? 1 : 0;
 
-                float3 pos = ReconstructPosition(input.uv, depth);
+                // float3 pos = ReconstructPosition(input.uv, depth);
+                //
+                // half2 offsetU = half2(_MainTex_TexelSize.x, 0);
+                // half2 offsetV = half2(0, _MainTex_TexelSize.y);
+                //
+                // float3 ddx = ReconstructPosition(input.uv + offsetU) - pos;
+                // float3 ddx2 = pos - ReconstructPosition(input.uv - offsetU);
+                // ddx = abs(ddx.z) > abs(ddx2.z) ? ddx2 : ddx;
+                //
+                // float3 ddy = ReconstructPosition(input.uv + offsetV) - pos;
+                // float3 ddy2 = pos - ReconstructPosition(input.uv - offsetV);
+                // ddy = abs(ddy.z) > abs(ddy2.z) ? ddy2 : ddy;
+                //
+                // float3 n = normalize(cross(ddy, ddx));
 
-                half2 offsetU = half2(_MainTex_TexelSize.x, 0);
-                half2 offsetV = half2(0, _MainTex_TexelSize.y);
-
-                float3 ddx = ReconstructPosition(input.uv + offsetU) - pos;
-                float3 ddx2 = pos - ReconstructPosition(input.uv - offsetU);
-                ddx = abs(ddx.z) > abs(ddx2.z) ? ddx2 : ddx;
-
-                float3 ddy = ReconstructPosition(input.uv + offsetV) - pos;
-                float3 ddy2 = pos - ReconstructPosition(input.uv - offsetV);
-                ddy = abs(ddy.z) > abs(ddy2.z) ? ddy2 : ddy;
-
-                float3 n = normalize(cross(ddy, ddx));
-
-                // float3 p = ReconstructPosition(input.uv, depth);
-                // float3 n = normalize(cross(ddy(p.xyz), ddx(p.xyz)));
+                float3 p = ReconstructPosition(input.uv, depth);
+                float3 n = normalize(cross(ddy(p.xyz), ddx(p.xyz)));
                 n *= enabled;
                 return half4(n * 0.5 + 0.5, depth);
             }
@@ -189,7 +189,7 @@
 
                 float3 normalDifference1 = normal2 - normal1;
                 float3 normalDifference2 = normal4 - normal3;
-                float edgeNormal = sqrt(dot(normalDifference1, normalDifference1) + dot(normalDifference2, normalDifference2));
+                float edgeNormal = sqrt(dot(normalDifference1, normalDifference1) + dot(normalDifference2, normalDifference2)) * enabled;
                 edgeNormal = edgeNormal > _EdgeNormalThreshold ? 1 : 0;
 
                 float depth1 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, uv[1]) * enabled;
