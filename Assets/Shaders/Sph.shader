@@ -202,7 +202,7 @@
                 float edgeDepth = sqrt(dot(depthDifference1, depthDifference1) + dot(depthDifference2, depthDifference2)) * 100 * enabled;
                 edgeDepth = edgeDepth > _EdgeDepthThreshold ? 1 : 0;
 
-                return edgeNormal;
+                return edgeNormal * edgeDepth;
             }
 
             SphLitVaryings SphLitPassVertex(Attributes input)

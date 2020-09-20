@@ -57,8 +57,8 @@ public class SphPass : ScriptableRenderPass
     {
         var depthTargetDescriptor = cameraTextureDescriptor;
         depthTargetDescriptor.colorFormat = RenderTextureFormat.RHalf;
-        depthTargetDescriptor.depthBufferBits = 32;
-        depthTargetDescriptor.msaaSamples = 4;
+        depthTargetDescriptor.depthBufferBits = 24;
+        depthTargetDescriptor.msaaSamples = 1;
 
         cmd.GetTemporaryRT(depthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
         ConfigureTarget(depthTargetHandle.id);
@@ -66,8 +66,8 @@ public class SphPass : ScriptableRenderPass
 
         var normalTargetDescriptor = cameraTextureDescriptor;
         normalTargetDescriptor.colorFormat = RenderTextureFormat.ARGB32;
-        normalTargetDescriptor.depthBufferBits = 32;
-        normalTargetDescriptor.msaaSamples = 4;
+        normalTargetDescriptor.depthBufferBits = 0;
+        normalTargetDescriptor.msaaSamples = 1;
         cmd.GetTemporaryRT(normalTargetHandle.id, normalTargetDescriptor, FilterMode.Point);
     }
 
@@ -92,8 +92,8 @@ public class SphPass : ScriptableRenderPass
         if (BlurringIterations > 0)
         {
             var blurringTargetDescriptor = renderingData.cameraData.cameraTargetDescriptor;
-            blurringTargetDescriptor.depthBufferBits = 32;
-            blurringTargetDescriptor.msaaSamples = 4;
+            blurringTargetDescriptor.depthBufferBits = 0;
+            blurringTargetDescriptor.msaaSamples = 2;
 
             var currentSource = depthTargetHandle;
             var currentDestination = blurringTargetHandles[0];

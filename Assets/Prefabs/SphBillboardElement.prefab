@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 1099760884}
   - component: {fileID: 1099760880}
   m_Layer: 8
-  m_Name: SphElement
+  m_Name: SphBillboardElement
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -106,7 +106,7 @@ SphereCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5896965615424042147}
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 13400000, guid: 9e4f9ca1dd12b4ed2acaaf385a0f47fa, type: 2}
   m_IsTrigger: 0
   m_Enabled: 1
   serializedVersion: 2
