@@ -15,23 +15,24 @@ MonoBehaviour:
   m_Active: 1
   settings:
     SphShader: {fileID: 4800000, guid: f8e7783eb94264fc9a83a07dcd92ce31, type: 3}
-    Event: 450
+    Event: 500
     LayerMask:
       serializedVersion: 2
       m_Bits: 256
-    Tint: {r: 0.8254717, g: 1, b: 1, a: 0.14901961}
+    Tint: {r: 0.8254717, g: 1, b: 1, a: 0.30588236}
     AmbientColor: {r: 0.3484336, g: 0.4578156, b: 0.5471698, a: 0}
     SpecularColor: {r: 1, g: 1, b: 1, a: 1}
     Glossiness: 28
     RimAmount: 0.7
     RimThreshold: 0.1
     DepthThreshold: 0.0005
-    DistortionStrength: 0.02
+    DepthScaleFactor: 1
+    DistortionStrength: 0.004
     BlurryIterations: 4
-    EdgeColor: {r: 1, g: 1, b: 1, a: 1}
+    EdgeColor: {r: 0, g: 0, b: 0, a: 1}
     EdgeScaleFactor: 2
-    EdgeDepthThreshold: 0.008
-    EdgeNormalThreshold: 0.496
+    EdgeDepthThreshold: 0
+    EdgeNormalThreshold: 0.481
     RenderQueueLowerBound: 0
     RenderQueueUpperBound: 5000
 --- !u!114 &11400000

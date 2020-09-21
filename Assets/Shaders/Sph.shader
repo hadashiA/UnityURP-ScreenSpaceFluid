@@ -100,9 +100,11 @@
             #pragma fragment DepthNormalPassFragment
 
             uniform half _DepthThreshold;
+            uniform half _DepthScaleFactor;
 
             float3 ReconstructPosition(float2 uv, float depth)
             {
+                depth = depth > _DepthThreshold ? depth : 0;
                 float x = uv.x * 2.0f - 1.0f;
                 float y = (1.0 - uv.y) * 2.0f - 1.0f;
                 float4 positionCS = float4(x, y, depth, 1.0f) * LinearEyeDepth(depth, _ZBufferParams);
@@ -119,12 +121,19 @@
             {
                 half depth = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, input.uv);
                 half enabled = depth > _DepthThreshold ? 1 : 0;
+                float3 pos = ReconstructPosition(input.uv, depth);
 
-                // float3 pos = ReconstructPosition(input.uv, depth);
-                //
-                // half2 offsetU = half2(_MainTex_TexelSize.x, 0);
-                // half2 offsetV = half2(0, _MainTex_TexelSize.y);
-                //
+             //    half2 offsetU = half2(_MainTex_TexelSize.x * _DepthScaleFactor, 0);
+             //    half2 offsetV = half2(0, _MainTex_TexelSize.y * _DepthScaleFactor);
+             //
+	            // float u1 = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, input.uv - offsetU);
+	            // float u2 = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, input.uv + offsetU);
+             //
+	            // float v1 = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, input.uv - offsetV);
+	            // float v2 = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, input.uv + offsetV);
+             //
+             //    float3 n = normalize(float3(u1 - u2, 1, v1 - v2));
+
                 // float3 ddx = ReconstructPosition(input.uv + offsetU) - pos;
                 // float3 ddx2 = pos - ReconstructPosition(input.uv - offsetU);
                 // ddx = abs(ddx.z) > abs(ddx2.z) ? ddx2 : ddx;
@@ -134,14 +143,13 @@
                 // ddy = abs(ddy.z) > abs(ddy2.z) ? ddy2 : ddy;
                 //
                 // float3 n = normalize(cross(ddy, ddx));
-
-                float3 p = ReconstructPosition(input.uv, depth);
-                float3 n = normalize(cross(ddy(p.xyz), ddx(p.xyz)));
+                float3 n = normalize(cross(ddy(pos.xyz), ddx(pos.xyz)));
                 #if defined(UNITY_REVERSED_Z)
                     n.z = -n.z;
                 #endif
                 n *= enabled;
-                return half4(n * 0.5 + 0.5, depth);
+                // return half4(n * 0.5 + 0.5, depth);
+                return half4(n, depth);
             }
             ENDHLSL
         }
@@ -205,7 +213,7 @@
                 float edgeDepth = sqrt(dot(depthDifference1, depthDifference1) + dot(depthDifference2, depthDifference2)) * 10 * enabled;
                 edgeDepth = edgeDepth > _EdgeDepthThreshold ? 1 : 0;
 
-                return edgeDepth * edgeNormal;
+                return edgeNormal * edgeDepth;
             }
 
             SphLitVaryings SphLitPassVertex(Attributes input)

@@ -27,6 +27,9 @@ public class SphRendererFeature : ScriptableRendererFeature
         [Range(0f, 0.1f)]
         public float DepthThreshold = 0.001f;
 
+        [Range(0, 20)]
+        public int DepthScaleFactor = 1;
+
         public float DistortionStrength = 1f;
 
         [Range(0, 16)]
@@ -69,6 +72,7 @@ public class SphRendererFeature : ScriptableRendererFeature
         sphMaterial.SetFloat("_RimAmount", settings.RimAmount);
         sphMaterial.SetFloat("_RimThreshold", settings.RimThreshold);
         sphMaterial.SetFloat("_DepthThreshold", settings.DepthThreshold);
+        sphMaterial.SetFloat("_DepthScaleFactor", settings.DepthScaleFactor);
         sphMaterial.SetFloat("_DistortionStrength", settings.DistortionStrength);
         sphMaterial.SetColor("_EdgeColor", settings.EdgeColor);
         sphMaterial.SetInt("_EdgeScaleFactor", settings.EdgeScaleFactor);
