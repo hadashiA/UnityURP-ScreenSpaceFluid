@@ -36,6 +36,59 @@
             float4 positionCS : SV_POSITION;
         };
 
+        // Encoding/decoding [0..1) floats into 8 bit/channel RG. Note that 1.0 will not be encoded properly.
+        inline float2 EncodeFloatRG(float v)
+        {
+            float2 kEncodeMul = float2(1.0, 255.0);
+            float kEncodeBit = 1.0/255.0;
+            float2 enc = kEncodeMul * v;
+            enc = frac (enc);
+            enc.x -= enc.y * kEncodeBit;
+            return enc;
+        }
+
+        float DecodeFloatRG(float2 enc)
+        {
+            float2 kDecodeDot = float2(1.0, 1/255.0);
+            return dot( enc, kDecodeDot );
+        }
+
+        // Encoding/decoding view space normals into 2D 0..1 vector
+        float2 EncodeViewNormalStereo(float3 n)
+        {
+            float kScale = 1.7777;
+            float2 enc;
+            enc = n.xy / (n.z+1);
+            enc /= kScale;
+            enc = enc*0.5+0.5;
+            return enc;
+        }
+
+        float3 DecodeViewNormalStereo(float4 enc4)
+        {
+            float kScale = 1.7777;
+            float3 nn = enc4.xyz*float3(2*kScale,2*kScale,0) + float3(-kScale,-kScale,1);
+            float g = 2.0 / dot(nn.xyz,nn.xyz);
+            float3 n;
+            n.xy = g*nn.xy;
+            n.z = g-1;
+            return n;
+        }
+
+        float4 EncodeDepthNormal(float depth, float3 normal)
+        {
+            float4 enc;
+            enc.xy = EncodeViewNormalStereo(normal);
+            enc.zw = EncodeFloatRG(depth);
+            return enc;
+        }
+
+        void DecodeDepthNormal(float4 enc, out float depth, out float3 normal)
+        {
+            depth = DecodeFloatRG (enc.zw);
+            normal = DecodeViewNormalStereo (enc);
+        }
+
         half3 Sample(float2 uv)
         {
             return SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);
@@ -111,37 +164,18 @@
                 return mul(UNITY_MATRIX_I_VP, positionCS);
             }
 
-            float3 ReconstructPosition(float2 uv)
-            {
-                float depth = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, uv);
-                return ReconstructPosition(uv, depth);
-            }
-
             half4 DepthNormalPassFragment(Varyings input) : SV_Target
             {
                 float depth = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, input.uv);
                 half enabled = depth > _DepthThreshold ? 1 : 0;
                 float3 pos = ReconstructPosition(input.uv, depth);
 
-                half2 offsetU = half2(_MainTex_TexelSize.x * _DepthScaleFactor, 0);
-                half2 offsetV = half2(0, _MainTex_TexelSize.y * _DepthScaleFactor);
-
-                float3 ddx = ReconstructPosition(input.uv + offsetU) - pos;
-                float3 ddx2 = pos - ReconstructPosition(input.uv - offsetU);
-                ddx = abs(ddx.z) > abs(ddx2.z) ? ddx2 : ddx;
-
-                float3 ddy = ReconstructPosition(input.uv + offsetV) - pos;
-                float3 ddy2 = pos - ReconstructPosition(input.uv - offsetV);
-                ddy = abs(ddy.z) > abs(ddy2.z) ? ddy2 : ddy;
-
-                float3 n = normalize(cross(ddy, ddx));
-                // float3 n = normalize(cross(ddy(pos.xyz), ddx(pos.xyz)));
-                // #if defined(UNITY_REVERSED_Z)
-                //     n.z = -n.z;
-                // #endif
+                float3 n = normalize(cross(ddy(pos.xyz), ddx(pos.xyz)));
+                #if defined(UNITY_REVERSED_Z)
+                    n.z = -n.z;
+                #endif
                 n *= enabled;
-                // return half4(n * 0.5 + 0.5, depth);
-                return float4(n, depth);
+                return EncodeDepthNormal(depth, n);
             }
             ENDHLSL
         }
@@ -185,20 +219,30 @@
 
             half EdgeDetection(float2 uv[5], half enabled)
             {
-                float3 normal1 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[1]).rgb * enabled;
-                float3 normal2 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[2]).rgb * enabled;
-                float3 normal3 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[3]).rgb * enabled;
-                float3 normal4 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[4]).rgb * enabled;
+                float3 normal1;
+                float3 normal2;
+                float3 normal3;
+                float3 normal4;
+
+                float depth1;
+                float depth2;
+                float depth3;
+                float depth4;
+
+                float4 depthNormal1 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[1]) * enabled;
+                float4 depthNormal2 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[2]) * enabled;
+                float4 depthNormal3 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[3]) * enabled;
+                float4 depthNormal4 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[4]) * enabled;
+
+                DecodeDepthNormal(depthNormal1, depth1, normal1);
+                DecodeDepthNormal(depthNormal2, depth2, normal2);
+                DecodeDepthNormal(depthNormal3, depth3, normal3);
+                DecodeDepthNormal(depthNormal4, depth4, normal4);
 
                 float3 normalDifference1 = normal2 - normal1;
                 float3 normalDifference2 = normal4 - normal3;
                 float edgeNormal = sqrt(dot(normalDifference1, normalDifference1) + dot(normalDifference2, normalDifference2)) * enabled;
                 edgeNormal = edgeNormal > _EdgeNormalThreshold ? 1 : 0;
-
-                float depth1 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, uv[1]) * enabled;
-                float depth2 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, uv[2]) * enabled;
-                float depth3 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, uv[3]) * enabled;
-                float depth4 = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, uv[4]) * enabled;
 
                 float depthDifference1 = depth2 - depth1;
                 float depthDifference2 = depth4 - depth3;
@@ -230,12 +274,14 @@
                 // Calculate Normal
                 // half destDepth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, input.uv);
                 float2 uv = input.uv[0];
-                float depth = SAMPLE_DEPTH_TEXTURE(_SphDepthTexture, sampler_SphDepthTexture, uv);
-                float3 n = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv).rgb;
-                n = n * 2 - 1; // decode
+                float4 depthNormal = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv);
+                float depth;
+                float3 n;
+                DecodeDepthNormal(depthNormal, depth, n);
 
                 // half enabled = depth > _DepthThreshold && depth < destDepth ? 1 : 0;
-                half enabled = depth > _DepthThreshold ? 1 : 0;
+                half cutout = UNITY_NEAR_CLIP_VALUE >= 0 ? _DepthThreshold : _DepthThreshold * 2 - 1;
+                half enabled = depth > cutout ? 1 : 0;
 
                 // Calculate Lighting
 

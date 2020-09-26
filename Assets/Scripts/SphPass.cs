@@ -40,7 +40,7 @@ public class SphPass : ScriptableRenderPass
         }
 
         depthTargetHandle.Init("_SphDepthTexture");
-        depthTargetHandle.Init("_SphNormalTexture");
+        normalTargetHandle.Init("_SphNormalTexture");
 
         downSamplingPass = material.FindPass("DownSampling");
         upSamplingPass = material.FindPass("UpSampling");
@@ -55,29 +55,30 @@ public class SphPass : ScriptableRenderPass
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
-        var blurringTargetDescriptor = cameraTextureDescriptor;
-        blurringTargetDescriptor.depthBufferBits = 16;
-        blurringTargetDescriptor.msaaSamples = 1;
+        var w = cameraTextureDescriptor.width;
+        var h = cameraTextureDescriptor.height;
+
+        var depthTargetDescriptor = new RenderTextureDescriptor(w, h, RenderTextureFormat.RFloat, 0, 0)
+        {
+            msaaSamples = 1
+        };
+
+        cmd.GetTemporaryRT(depthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
 
         for (var i = 0; i < BlurringIterations; i++)
         {
-            blurringTargetDescriptor.width /= 2;
-            blurringTargetDescriptor.height /= 2;
-            cmd.GetTemporaryRT(blurringTargetHandles[i].id, blurringTargetDescriptor, FilterMode.Bilinear);
+            depthTargetDescriptor.width /= 2;
+            depthTargetDescriptor.height /= 2;
+            cmd.GetTemporaryRT(blurringTargetHandles[i].id, depthTargetDescriptor, FilterMode.Bilinear);
         }
 
-        var normalTargetDescriptor = cameraTextureDescriptor;
-        normalTargetDescriptor.colorFormat = RenderTextureFormat.ARGB32;
-        normalTargetDescriptor.depthBufferBits = 0;
-        normalTargetDescriptor.msaaSamples = 1;
+        var normalTargetDescriptor = new RenderTextureDescriptor(w, h, RenderTextureFormat.ARGB32, 0, 0)
+        {
+            msaaSamples = 1
+        };
+
         cmd.GetTemporaryRT(normalTargetHandle.id, normalTargetDescriptor, FilterMode.Point);
 
-        var depthTargetDescriptor = cameraTextureDescriptor;
-        depthTargetDescriptor.colorFormat = RenderTextureFormat.RFloat;
-        depthTargetDescriptor.depthBufferBits = 16;
-        depthTargetDescriptor.msaaSamples = 1;
-
-        cmd.GetTemporaryRT(depthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
         ConfigureTarget(depthTargetHandle.id);
         ConfigureClear(ClearFlag.All, Color.black);
     }
@@ -86,7 +87,7 @@ public class SphPass : ScriptableRenderPass
     {
         var cmd = CommandBufferPool.Get(profilingSampler.name);
 
-        cmd.SetRenderTarget(depthTargetHandle.id);
+        // cmd.SetRenderTarget(depthTargetHandle.id);
         // cmd.ClearRenderTarget(true, true, Color.red, 1f);
 
         // Draw depth
@@ -102,18 +103,15 @@ public class SphPass : ScriptableRenderPass
         // Down sampling
         if (BlurringIterations > 0)
         {
-            var currentSource = depthTargetHandle;
-            var currentDestination = blurringTargetHandles[0];
+            var currentSource = default(RenderTargetHandle);
+            var currentDestination = depthTargetHandle;
 
             for (var i = 0; i < BlurringIterations; i++)
             {
-                cmd.Blit(currentSource.id, currentDestination.id, material, downSamplingPass);
+                currentSource = currentDestination;
+                currentDestination = blurringTargetHandles[i];
 
-                if (i < BlurringIterations - 1)
-                {
-                    currentSource = currentDestination;
-                    currentDestination = blurringTargetHandles[i];
-                }
+                cmd.Blit(currentSource.id, currentDestination.id, material, downSamplingPass);
             }
 
             // Up sampling
@@ -125,6 +123,7 @@ public class SphPass : ScriptableRenderPass
                 cmd.Blit(currentSource.id, currentDestination.id, material, upSamplingPass);
             }
 
+            // TODO: これいらない
             cmd.Blit(currentDestination.id, depthTargetHandle.id, material, upSamplingPass);
         }
 
