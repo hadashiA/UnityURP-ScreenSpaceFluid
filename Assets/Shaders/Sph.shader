@@ -241,12 +241,12 @@
 
                 float3 normalDifference1 = normal2 - normal1;
                 float3 normalDifference2 = normal4 - normal3;
-                float edgeNormal = sqrt(dot(normalDifference1, normalDifference1) + dot(normalDifference2, normalDifference2)) * enabled;
+                float edgeNormal = sqrt(dot(normalDifference1, normalDifference1) + dot(normalDifference2, normalDifference2));
                 edgeNormal = edgeNormal > _EdgeNormalThreshold ? 1 : 0;
 
                 float depthDifference1 = depth2 - depth1;
                 float depthDifference2 = depth4 - depth3;
-                float edgeDepth = sqrt(dot(depthDifference1, depthDifference1) + dot(depthDifference2, depthDifference2)) * 100 * enabled;
+                float edgeDepth = sqrt(dot(depthDifference1, depthDifference1) + dot(depthDifference2, depthDifference2)) * 200;
                 edgeDepth = edgeDepth > _EdgeDepthThreshold ? 1 : 0;
 
                 return edgeNormal * edgeDepth;
@@ -316,7 +316,7 @@
                 half3 color = _Tint.rgb * (_AmbientColor + light + specular.rgb + rim);
                 color = lerp(screen.rgb, color, enabled * _Tint.a);
                 color = lerp(color, _EdgeColor.rgb, edge);
-                return half4(n * 0.5 + 0.5, 1);
+                return half4(color, 1);
             }
             ENDHLSL
         }

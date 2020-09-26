@@ -100,12 +100,12 @@ public class SphPass : ScriptableRenderPass
 
         // Blurring
 
+        var currentSource = default(RenderTargetHandle);
+        var currentDestination = depthTargetHandle;
+
         // Down sampling
         if (BlurringIterations > 0)
         {
-            var currentSource = default(RenderTargetHandle);
-            var currentDestination = depthTargetHandle;
-
             for (var i = 0; i < BlurringIterations; i++)
             {
                 currentSource = currentDestination;
@@ -122,9 +122,6 @@ public class SphPass : ScriptableRenderPass
 
                 cmd.Blit(currentSource.id, currentDestination.id, material, upSamplingPass);
             }
-
-            // TODO: これいらない
-            cmd.Blit(currentDestination.id, depthTargetHandle.id, material, upSamplingPass);
         }
 
         // Draw Normal
@@ -135,7 +132,7 @@ public class SphPass : ScriptableRenderPass
         var matrixHClipToWorld = matrixCameraToWorld * matrixProjectionInverse;
         cmd.SetGlobalMatrix("_MatrixHClipToWorld", matrixHClipToWorld);
         cmd.SetGlobalTexture("_SphDepthTexture", depthTargetHandle.id);
-        cmd.Blit(depthTargetHandle.id, normalTargetHandle.id, material, depthNormalPass);
+        cmd.Blit(currentDestination.id, normalTargetHandle.id, material, depthNormalPass);
 
         // Lighting
 
