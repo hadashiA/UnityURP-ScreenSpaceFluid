@@ -62,9 +62,9 @@
             // Tags { "LightMode" = "UniversalForward" }
             Tags { "LightMode" = "SphBillboardSphereDepth" }
 
-            ZWrite On
-            Cull Back
-            ZTest On
+//            ZWrite On
+//            Cull Back
+//            ZTest On
 
             HLSLPROGRAM
 
@@ -114,25 +114,25 @@
 				return output;
             }
 
-            half4 PassFragment(Varyings input) : SV_Target
+            float4 PassFragment(Varyings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input)
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input)
 
-                half2 st = input.uv * 2 - 1; // 0-1 → -1-1
+                float2 st = input.uv * 2 - 1; // 0-1 → -1-1
                 half d2 = dot(st, st); // squared distance
 
                 // 半径を越える部分は描画しない
                 // TODO: アルファチャンネルがないので clipを使ってる
                 clip(d2 > 1 ? -1 : 1);
 
-                half3 n = half3(st.xy, sqrt(1 - d2));
+                float3 n = float3(st.xy, sqrt(1 - d2));
 
                 // 球としての座標を計算
                 float3 positionVS = float4(input.positionVS + n, 1);
                 float4 positionCS = TransformWViewToHClip(positionVS);
 
-                half depth = positionCS.z / positionCS.w;
+                float depth = positionCS.z / positionCS.w;
                 return depth;
             }
             ENDHLSL

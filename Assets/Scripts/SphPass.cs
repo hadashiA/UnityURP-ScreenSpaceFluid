@@ -55,20 +55,31 @@ public class SphPass : ScriptableRenderPass
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
-        var depthTargetDescriptor = cameraTextureDescriptor;
-        depthTargetDescriptor.colorFormat = RenderTextureFormat.RHalf;
-        depthTargetDescriptor.depthBufferBits = 24;
-        depthTargetDescriptor.msaaSamples = 1;
+        var blurringTargetDescriptor = cameraTextureDescriptor;
+        blurringTargetDescriptor.depthBufferBits = 16;
+        blurringTargetDescriptor.msaaSamples = 1;
 
-        cmd.GetTemporaryRT(depthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
-        ConfigureTarget(depthTargetHandle.id);
-        ConfigureClear(ClearFlag.All, Color.black);
+        for (var i = 0; i < BlurringIterations; i++)
+        {
+            blurringTargetDescriptor.width /= 2;
+            blurringTargetDescriptor.height /= 2;
+            cmd.GetTemporaryRT(blurringTargetHandles[i].id, blurringTargetDescriptor, FilterMode.Bilinear);
+        }
 
         var normalTargetDescriptor = cameraTextureDescriptor;
         normalTargetDescriptor.colorFormat = RenderTextureFormat.ARGB32;
         normalTargetDescriptor.depthBufferBits = 0;
         normalTargetDescriptor.msaaSamples = 1;
         cmd.GetTemporaryRT(normalTargetHandle.id, normalTargetDescriptor, FilterMode.Point);
+
+        var depthTargetDescriptor = cameraTextureDescriptor;
+        depthTargetDescriptor.colorFormat = RenderTextureFormat.RFloat;
+        depthTargetDescriptor.depthBufferBits = 16;
+        depthTargetDescriptor.msaaSamples = 1;
+
+        cmd.GetTemporaryRT(depthTargetHandle.id, depthTargetDescriptor, FilterMode.Point);
+        ConfigureTarget(depthTargetHandle.id);
+        ConfigureClear(ClearFlag.All, Color.black);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -91,18 +102,11 @@ public class SphPass : ScriptableRenderPass
         // Down sampling
         if (BlurringIterations > 0)
         {
-            var blurringTargetDescriptor = renderingData.cameraData.cameraTargetDescriptor;
-            blurringTargetDescriptor.depthBufferBits = 0;
-            blurringTargetDescriptor.msaaSamples = 2;
-
             var currentSource = depthTargetHandle;
             var currentDestination = blurringTargetHandles[0];
 
             for (var i = 0; i < BlurringIterations; i++)
             {
-                blurringTargetDescriptor.width /= 2;
-                blurringTargetDescriptor.height /= 2;
-                cmd.GetTemporaryRT(currentDestination.id, blurringTargetDescriptor, FilterMode.Bilinear);
                 cmd.Blit(currentSource.id, currentDestination.id, material, downSamplingPass);
 
                 if (i < BlurringIterations - 1)
