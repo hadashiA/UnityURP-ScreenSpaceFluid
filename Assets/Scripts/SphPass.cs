@@ -148,6 +148,7 @@ public class SphPass : ScriptableRenderPass
     public override void FrameCleanup(CommandBuffer cmd)
     {
         cmd.ReleaseTemporaryRT(depthTargetHandle.id);
+        cmd.ReleaseTemporaryRT(normalTargetHandle.id);
         foreach (var targetHandle in blurringTargetHandles)
         {
             cmd.ReleaseTemporaryRT(targetHandle.id);
