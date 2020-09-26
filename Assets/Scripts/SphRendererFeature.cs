@@ -24,7 +24,7 @@ public class SphRendererFeature : ScriptableRendererFeature
         [Range(0f, 1f)]
         public float RimThreshold = 0.1f;
 
-        [Range(0f, 0.1f)]
+        [Range(0f, 1f)]
         public float DepthThreshold = 0.001f;
 
         [Range(0, 20)]

@@ -50,7 +50,7 @@
         float DecodeFloatRG(float2 enc)
         {
             float2 kDecodeDot = float2(1.0, 1/255.0);
-            return dot( enc, kDecodeDot );
+            return dot(enc, kDecodeDot);
         }
 
         // Encoding/decoding view space normals into 2D 0..1 vector
@@ -86,7 +86,7 @@
         void DecodeDepthNormal(float4 enc, out float depth, out float3 normal)
         {
             depth = DecodeFloatRG (enc.zw);
-            normal = DecodeViewNormalStereo (enc);
+            normal = DecodeViewNormalStereo(enc);
         }
 
         half3 Sample(float2 uv)
@@ -152,29 +152,31 @@
             #pragma vertex BlitPassVertex
             #pragma fragment DepthNormalPassFragment
 
+            uniform float4x4 _MatrixClipToView;
             uniform half _DepthThreshold;
-            uniform half _DepthScaleFactor;
 
             float3 ReconstructPosition(float2 uv, float depth)
             {
-                depth = depth > _DepthThreshold ? depth : 0;
                 float x = uv.x * 2.0f - 1.0f;
                 float y = (1.0 - uv.y) * 2.0f - 1.0f;
                 float4 positionCS = float4(x, y, depth, 1.0f) * LinearEyeDepth(depth, _ZBufferParams);
-                return mul(UNITY_MATRIX_I_VP, positionCS);
+                return mul(_MatrixClipToView, positionCS);
             }
 
             half4 DepthNormalPassFragment(Varyings input) : SV_Target
             {
                 float depth = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, input.uv);
-                half enabled = depth > _DepthThreshold ? 1 : 0;
-                float3 pos = ReconstructPosition(input.uv, depth);
+                float depth01 = Linear01Depth(depth, _ZBufferParams);
+                half enabled = 1 - depth01 > _DepthThreshold ? 1 : 0;
 
+                float3 pos = ReconstructPosition(input.uv, depth);
                 float3 n = normalize(cross(ddy(pos.xyz), ddx(pos.xyz)));
                 #if defined(UNITY_REVERSED_Z)
                     n.z = -n.z;
                 #endif
+
                 n *= enabled;
+                depth *= enabled;
                 return EncodeDepthNormal(depth, n);
             }
             ENDHLSL
@@ -217,7 +219,7 @@
                 float3 viewDirWS : TEXCOORD5;
             };
 
-            half EdgeDetection(float2 uv[5], half enabled)
+            half EdgeDetection(float2 uv[5])
             {
                 float3 normal1;
                 float3 normal2;
@@ -229,10 +231,10 @@
                 float depth3;
                 float depth4;
 
-                float4 depthNormal1 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[1]) * enabled;
-                float4 depthNormal2 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[2]) * enabled;
-                float4 depthNormal3 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[3]) * enabled;
-                float4 depthNormal4 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[4]) * enabled;
+                float4 depthNormal1 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[1]);
+                float4 depthNormal2 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[2]);
+                float4 depthNormal3 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[3]);
+                float4 depthNormal4 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[4]);
 
                 DecodeDepthNormal(depthNormal1, depth1, normal1);
                 DecodeDepthNormal(depthNormal2, depth2, normal2);
@@ -279,9 +281,7 @@
                 float3 n;
                 DecodeDepthNormal(depthNormal, depth, n);
 
-                // half enabled = depth > _DepthThreshold && depth < destDepth ? 1 : 0;
-                half cutout = UNITY_NEAR_CLIP_VALUE >= 0 ? _DepthThreshold : _DepthThreshold * 2 - 1;
-                half enabled = depth > cutout ? 1 : 0;
+                half enabled = depth > 0 ? 1 : 0;
 
                 // Calculate Lighting
 
@@ -305,12 +305,12 @@
 				float4 rim = rimIntensity * _SpecColor;
 
                 // Screen Distortion
-                float2 uvScreenOffset = n.xy * _DistortionStrength;
+                float2 uvScreenOffset = n.xy * _DistortionStrength * enabled;
                 float2 uvScreenDistort = uv + uvScreenOffset;
                 half4 screen = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uvScreenDistort);
 
                 // Edge Detection
-                half edge = EdgeDetection(input.uv, enabled);
+                half edge = EdgeDetection(input.uv);
 
                 // Merge
                 half3 color = _Tint.rgb * (_AmbientColor + light + specular.rgb + rim);
