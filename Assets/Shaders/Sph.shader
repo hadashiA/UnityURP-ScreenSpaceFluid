@@ -194,14 +194,17 @@
             uniform half4 _Tint;
             uniform half4 _AmbientColor;
             uniform half4 _SpecColor;
-            uniform half _DepthThreshold;
             uniform half _RimAmount;
             uniform half _RimThreshold;
             uniform half _Gloss;
+
+            // Edge
             uniform half4 _EdgeColor;
             uniform half _EdgeScaleFactor;
             uniform half _EdgeDepthThreshold;
             uniform half _EdgeNormalThreshold;
+            uniform half _EdgeDepthNormalThreshold;
+            uniform half _EdgeDepthNormalThresholdScale;
 
             uniform TEXTURE2D(_SphDepthTexture);
             uniform SAMPLER(sampler_SphDepthTexture);
@@ -217,19 +220,13 @@
                 float2 uv[5] : TEXCOORD0;
                 float4 positionCS : SV_POSITION;
                 float3 viewDirWS : TEXCOORD5;
+                float3 viewDirVS : TEXCOORD6;
             };
 
-            half EdgeDetection(float2 uv[5])
+            half EdgeDetection(float2 uv[5], float3 viewDirWS)
             {
-                float3 normal1;
-                float3 normal2;
-                float3 normal3;
-                float3 normal4;
-
-                float depth1;
-                float depth2;
-                float depth3;
-                float depth4;
+                float3 normal1, normal2, normal3, normal4;
+                float depth1, depth2, depth3, depth4;
 
                 float4 depthNormal1 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[1]);
                 float4 depthNormal2 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[2]);
@@ -241,17 +238,20 @@
                 DecodeDepthNormal(depthNormal3, depth3, normal3);
                 DecodeDepthNormal(depthNormal4, depth4, normal4);
 
+                float nDotV = dot(normal1, viewDirWS);
+
+                float depthDifference1 = depth2 - depth1;
+                float depthDifference2 = depth4 - depth3;
+                float edgeDepth = sqrt(dot(depthDifference1, depthDifference1) + dot(depthDifference2, depthDifference2)) * 100;
+                edgeDepth = edgeDepth > _EdgeDepthThreshold ? 1 : 0;
+
                 float3 normalDifference1 = normal2 - normal1;
                 float3 normalDifference2 = normal4 - normal3;
                 float edgeNormal = sqrt(dot(normalDifference1, normalDifference1) + dot(normalDifference2, normalDifference2));
                 edgeNormal = edgeNormal > _EdgeNormalThreshold ? 1 : 0;
 
-                float depthDifference1 = depth2 - depth1;
-                float depthDifference2 = depth4 - depth3;
-                float edgeDepth = sqrt(dot(depthDifference1, depthDifference1) + dot(depthDifference2, depthDifference2)) * 200;
-                edgeDepth = edgeDepth > _EdgeDepthThreshold ? 1 : 0;
-
-                return edgeNormal * edgeDepth;
+                return edgeNormal * edgeDepth * (nDotV > 0.4 ? 1 : 0);
+                // return max(edgeDepth, edgeNormal);
             }
 
             SphLitVaryings SphLitPassVertex(Attributes input)
@@ -261,6 +261,7 @@
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
                 output.positionCS = vertexInput.positionCS;
                 output.viewDirWS = GetCameraPositionWS() - vertexInput.positionWS;
+                output.viewDirVS = TransformWorldToView(vertexInput.positionWS);
 
                 output.uv[0] = input.uv;
                 output.uv[1] = input.uv + _MainTex_TexelSize.xy * half2( 1, 1) * _EdgeScaleFactor;
@@ -280,6 +281,8 @@
                 float depth;
                 float3 n;
                 DecodeDepthNormal(depthNormal, depth, n);
+                n = TransformObjectToWorldNormal(n);
+
 
                 half enabled = depth > 0 ? 1 : 0;
 
@@ -310,7 +313,7 @@
                 half4 screen = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uvScreenDistort);
 
                 // Edge Detection
-                half edge = EdgeDetection(input.uv);
+                half edge = EdgeDetection(input.uv, input.viewDirWS);
 
                 // Merge
                 half3 color = _Tint.rgb * (_AmbientColor + light + specular.rgb + rim);

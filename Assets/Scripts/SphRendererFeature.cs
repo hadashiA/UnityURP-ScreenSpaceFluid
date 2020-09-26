@@ -45,6 +45,11 @@ public class SphRendererFeature : ScriptableRendererFeature
         [Range(0f, 1f)]
         public float EdgeNormalThreshold = 0.2f;
 
+        [Range(0f, 1f)]
+        public float EdgeDepthNormalThreshold = 0.2f;
+
+        public float EdgeDepthNormalThresholdScale = 1f;
+
         [Range(0, 5000)]
         public int RenderQueueLowerBound = 0;
 
