@@ -11,7 +11,7 @@ public class SphPass : ScriptableRenderPass
 
     readonly Material material;
     readonly RenderTargetHandle depthTargetHandle;
-    readonly RenderTargetHandle normalTargetHandle;
+    readonly RenderTargetHandle depthNormalTargetHandle;
     readonly RenderTargetHandle[] blurringTargetHandles;
 
     readonly int downSamplingPass;
@@ -40,7 +40,7 @@ public class SphPass : ScriptableRenderPass
         }
 
         depthTargetHandle.Init("_SphDepthTexture");
-        normalTargetHandle.Init("_SphNormalTexture");
+        depthNormalTargetHandle.Init("_SphNormalTexture");
 
         downSamplingPass = material.FindPass("DownSampling");
         upSamplingPass = material.FindPass("UpSampling");
@@ -77,7 +77,7 @@ public class SphPass : ScriptableRenderPass
             msaaSamples = 1
         };
 
-        cmd.GetTemporaryRT(normalTargetHandle.id, normalTargetDescriptor, FilterMode.Point);
+        cmd.GetTemporaryRT(depthNormalTargetHandle.id, normalTargetDescriptor, FilterMode.Point);
 
         ConfigureTarget(depthTargetHandle.id);
         ConfigureClear(ClearFlag.All, Color.black);
@@ -94,8 +94,6 @@ public class SphPass : ScriptableRenderPass
         var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
         var drawSettings = CreateDrawingSettings(sphDepthShaderTagId, ref renderingData, sortFlags);
         drawSettings.perObjectData = PerObjectData.None;
-        // drawSettings.overrideMaterial = material;
-        // drawSettings.overrideMaterialPassIndex = elementDepthPass;
         context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
         // Blurring
@@ -126,19 +124,13 @@ public class SphPass : ScriptableRenderPass
 
         // Draw Normal
 
-        var camera = renderingData.cameraData.camera;
-        var matrixCameraToWorld = camera.cameraToWorldMatrix;
-        var matrixProjectionInverse = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
-        var matrixHClipToWorld = matrixCameraToWorld * matrixProjectionInverse;
-        cmd.SetGlobalMatrix("_MatrixHClipToWorld", matrixHClipToWorld);
-        cmd.SetGlobalTexture("_SphDepthTexture", depthTargetHandle.id);
-        cmd.Blit(currentDestination.id, normalTargetHandle.id, material, depthNormalPass);
+        var clipToView = GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, true).inverse;
+        cmd.SetGlobalMatrix("_MatrixClipToView", clipToView);
+        cmd.Blit(currentDestination.id, depthNormalTargetHandle.id, material, depthNormalPass);
 
         // Lighting
 
-        var clipToView = GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, true).inverse;
-        cmd.SetGlobalMatrix("_MatrixClipToView", clipToView);
-        cmd.SetGlobalTexture("_SphNormalTexture", normalTargetHandle.id);
+        cmd.SetGlobalTexture("_SphDepthNormalTexture", depthNormalTargetHandle.id);
         cmd.Blit(source, source, material, litPass);
 
         context.ExecuteCommandBuffer(cmd);
@@ -148,7 +140,7 @@ public class SphPass : ScriptableRenderPass
     public override void FrameCleanup(CommandBuffer cmd)
     {
         cmd.ReleaseTemporaryRT(depthTargetHandle.id);
-        cmd.ReleaseTemporaryRT(normalTargetHandle.id);
+        cmd.ReleaseTemporaryRT(depthNormalTargetHandle.id);
         foreach (var targetHandle in blurringTargetHandles)
         {
             cmd.ReleaseTemporaryRT(targetHandle.id);

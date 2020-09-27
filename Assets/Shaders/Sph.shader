@@ -157,13 +157,14 @@
 
             float3 ReconstructPosition(float2 uv, float depth)
             {
-                float x = uv.x * 2.0f - 1.0f;
-                float y = (1.0 - uv.y) * 2.0f - 1.0f;
-                float4 positionCS = float4(x, y, depth, 1.0f) * LinearEyeDepth(depth, _ZBufferParams);
-                return mul(_MatrixClipToView, positionCS);
+                float x = uv.x * 2 - 1;
+                float y = (1 - uv.y) * 2 - 1;
+                float4 positionCS = float4(x, y, depth, 1);
+                float4 positionVS = mul(_MatrixClipToView, positionCS);
+                return positionVS / positionVS.w;
             }
 
-            half4 DepthNormalPassFragment(Varyings input) : SV_Target
+            float4 DepthNormalPassFragment(Varyings input) : SV_Target
             {
                 float depth = SAMPLE_DEPTH_TEXTURE(_MainTex, sampler_MainTex, input.uv);
                 float depth01 = Linear01Depth(depth, _ZBufferParams);
@@ -171,9 +172,7 @@
 
                 float3 pos = ReconstructPosition(input.uv, depth);
                 float3 n = normalize(cross(ddy(pos.xyz), ddx(pos.xyz)));
-                #if defined(UNITY_REVERSED_Z)
-                    n.z = -n.z;
-                #endif
+                n = 1 - n;
 
                 n *= enabled;
                 depth *= enabled;
@@ -203,24 +202,15 @@
             uniform half _EdgeScaleFactor;
             uniform half _EdgeDepthThreshold;
             uniform half _EdgeNormalThreshold;
-            uniform half _EdgeDepthNormalThreshold;
-            uniform half _EdgeDepthNormalThresholdScale;
 
-            uniform TEXTURE2D(_SphDepthTexture);
-            uniform SAMPLER(sampler_SphDepthTexture);
-            uniform float4 _SphDepthTexture_TexelSize;
-
-            uniform TEXTURE2D(_SphNormalTexture);
-            uniform SAMPLER(sampler_SphNormalTexture);
-
-            uniform float4x4 _MatrixClipToView;
+            uniform TEXTURE2D(_SphDepthNormalTexture);
+            uniform SAMPLER(sampler_SphDepthNormalTexture);
 
             struct SphLitVaryings
             {
                 float2 uv[5] : TEXCOORD0;
                 float4 positionCS : SV_POSITION;
                 float3 viewDirWS : TEXCOORD5;
-                float3 viewDirVS : TEXCOORD6;
             };
 
             half EdgeDetection(float2 uv[5], float3 viewDirWS)
@@ -228,10 +218,10 @@
                 float3 normal1, normal2, normal3, normal4;
                 float depth1, depth2, depth3, depth4;
 
-                float4 depthNormal1 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[1]);
-                float4 depthNormal2 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[2]);
-                float4 depthNormal3 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[3]);
-                float4 depthNormal4 = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv[4]);
+                float4 depthNormal1 = SAMPLE_TEXTURE2D(_SphDepthNormalTexture, sampler_SphDepthNormalTexture, uv[1]);
+                float4 depthNormal2 = SAMPLE_TEXTURE2D(_SphDepthNormalTexture, sampler_SphDepthNormalTexture, uv[2]);
+                float4 depthNormal3 = SAMPLE_TEXTURE2D(_SphDepthNormalTexture, sampler_SphDepthNormalTexture, uv[3]);
+                float4 depthNormal4 = SAMPLE_TEXTURE2D(_SphDepthNormalTexture, sampler_SphDepthNormalTexture, uv[4]);
 
                 DecodeDepthNormal(depthNormal1, depth1, normal1);
                 DecodeDepthNormal(depthNormal2, depth2, normal2);
@@ -251,7 +241,6 @@
                 edgeNormal = edgeNormal > _EdgeNormalThreshold ? 1 : 0;
 
                 return edgeNormal * edgeDepth * (nDotV > 0.4 ? 1 : 0);
-                // return max(edgeDepth, edgeNormal);
             }
 
             SphLitVaryings SphLitPassVertex(Attributes input)
@@ -261,7 +250,6 @@
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
                 output.positionCS = vertexInput.positionCS;
                 output.viewDirWS = GetCameraPositionWS() - vertexInput.positionWS;
-                output.viewDirVS = TransformWorldToView(vertexInput.positionWS);
 
                 output.uv[0] = input.uv;
                 output.uv[1] = input.uv + _MainTex_TexelSize.xy * half2( 1, 1) * _EdgeScaleFactor;
@@ -274,15 +262,12 @@
 
             half4 SphLitPassFragment(SphLitVaryings input) : SV_Target
             {
-                // Calculate Normal
-                // half destDepth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, input.uv);
                 float2 uv = input.uv[0];
-                float4 depthNormal = SAMPLE_TEXTURE2D(_SphNormalTexture, sampler_SphNormalTexture, uv);
+                float4 depthNormal = SAMPLE_TEXTURE2D(_SphDepthNormalTexture, sampler_SphDepthNormalTexture, uv);
                 float depth;
                 float3 n;
                 DecodeDepthNormal(depthNormal, depth, n);
-                n = TransformObjectToWorldNormal(n);
-
+                // n = 1 - n;
 
                 half enabled = depth > 0 ? 1 : 0;
 
