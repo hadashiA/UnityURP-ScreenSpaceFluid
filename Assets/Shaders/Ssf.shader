@@ -1,4 +1,4 @@
-﻿Shader "SampleSph/Hidden/Sph"
+﻿Shader "SampleSsf/Hidden/Ssf"
 {
     Properties
     {
@@ -157,11 +157,14 @@
 
             float3 ReconstructPosition(float2 uv, float depth)
             {
-                float x = uv.x * 2 - 1;
-                float y = (1 - uv.y) * 2 - 1;
-                float4 positionCS = float4(x, y, depth, 1);
-                float4 positionVS = mul(_MatrixClipToView, positionCS);
-                return positionVS / positionVS.w;
+                // float x = uv.x * 2 - 1;
+                // float y = (1 - uv.y) * 2 - 1;
+                float2 positionNDC = uv;
+                // float4 positionCS = ComputeClipSpacePosition(float2(x, y), depth);
+                // // float4 positionNDC = float4(x, y, depth, 1);
+                // float4 positionVS = mul(_MatrixClipToView, positionCS);
+                // return positionVS / positionVS.w;
+                return ComputeViewSpacePosition(positionNDC, depth, _MatrixClipToView);
             }
 
             float4 DepthNormalPassFragment(Varyings input) : SV_Target
@@ -183,11 +186,11 @@
 
         Pass
         {
-            Name "SphLit"
+            Name "SsfLit"
 
             HLSLPROGRAM
-            #pragma vertex SphLitPassVertex
-            #pragma fragment SphLitPassFragment
+            #pragma vertex SsfLitPassVertex
+            #pragma fragment SsfLitPassFragment
 
             uniform half _DistortionStrength;
             uniform half4 _Tint;
@@ -203,10 +206,10 @@
             uniform half _EdgeDepthThreshold;
             uniform half _EdgeNormalThreshold;
 
-            uniform TEXTURE2D(_SphDepthNormalTexture);
-            uniform SAMPLER(sampler_SphDepthNormalTexture);
+            uniform TEXTURE2D(_SsfDepthNormalTexture);
+            uniform SAMPLER(sampler_SsfDepthNormalTexture);
 
-            struct SphLitVaryings
+            struct SsfLitVaryings
             {
                 float2 uv[5] : TEXCOORD0;
                 float4 positionCS : SV_POSITION;
@@ -218,10 +221,10 @@
                 float3 normal1, normal2, normal3, normal4;
                 float depth1, depth2, depth3, depth4;
 
-                float4 depthNormal1 = SAMPLE_TEXTURE2D(_SphDepthNormalTexture, sampler_SphDepthNormalTexture, uv[1]);
-                float4 depthNormal2 = SAMPLE_TEXTURE2D(_SphDepthNormalTexture, sampler_SphDepthNormalTexture, uv[2]);
-                float4 depthNormal3 = SAMPLE_TEXTURE2D(_SphDepthNormalTexture, sampler_SphDepthNormalTexture, uv[3]);
-                float4 depthNormal4 = SAMPLE_TEXTURE2D(_SphDepthNormalTexture, sampler_SphDepthNormalTexture, uv[4]);
+                float4 depthNormal1 = SAMPLE_TEXTURE2D(_SsfDepthNormalTexture, sampler_SsfDepthNormalTexture, uv[1]);
+                float4 depthNormal2 = SAMPLE_TEXTURE2D(_SsfDepthNormalTexture, sampler_SsfDepthNormalTexture, uv[2]);
+                float4 depthNormal3 = SAMPLE_TEXTURE2D(_SsfDepthNormalTexture, sampler_SsfDepthNormalTexture, uv[3]);
+                float4 depthNormal4 = SAMPLE_TEXTURE2D(_SsfDepthNormalTexture, sampler_SsfDepthNormalTexture, uv[4]);
 
                 DecodeDepthNormal(depthNormal1, depth1, normal1);
                 DecodeDepthNormal(depthNormal2, depth2, normal2);
@@ -243,9 +246,9 @@
                 return edgeNormal * edgeDepth * (nDotV > 0.4 ? 1 : 0);
             }
 
-            SphLitVaryings SphLitPassVertex(Attributes input)
+            SsfLitVaryings SsfLitPassVertex(Attributes input)
             {
-                SphLitVaryings output = (SphLitVaryings)0;
+                SsfLitVaryings output = (SsfLitVaryings)0;
 
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
                 output.positionCS = vertexInput.positionCS;
@@ -260,14 +263,14 @@
                 return output;
             }
 
-            half4 SphLitPassFragment(SphLitVaryings input) : SV_Target
+            half4 SsfLitPassFragment(SsfLitVaryings input) : SV_Target
             {
                 float2 uv = input.uv[0];
-                float4 depthNormal = SAMPLE_TEXTURE2D(_SphDepthNormalTexture, sampler_SphDepthNormalTexture, uv);
+                float4 depthNormal = SAMPLE_TEXTURE2D(_SsfDepthNormalTexture, sampler_SsfDepthNormalTexture, uv);
                 float depth;
                 float3 n;
                 DecodeDepthNormal(depthNormal, depth, n);
-                // n = 1 - n;
+                n = 1 - n;
 
                 half enabled = depth > 0 ? 1 : 0;
 

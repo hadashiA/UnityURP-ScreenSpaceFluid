@@ -3,12 +3,12 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-public class SphRendererFeature : ScriptableRendererFeature
+public class SsfRendererFeature : ScriptableRendererFeature
 {
     [Serializable]
-    public sealed class SphSettings
+    public sealed class SsfSettings
     {
-        public Shader SphShader;
+        public Shader SsfShader;
         public RenderPassEvent Event = RenderPassEvent.BeforeRenderingTransparents;
 
         public LayerMask LayerMask;
@@ -53,39 +53,39 @@ public class SphRendererFeature : ScriptableRendererFeature
     }
 
     [SerializeField]
-    SphSettings settings = new SphSettings();
+    SsfSettings settings = new SsfSettings();
 
-    SphPass pass;
+    SsfPass pass;
 
     public override void Create()
     {
-        var sphShader = settings.SphShader;
-        if (sphShader == null)
-            sphShader = Shader.Find("SampleSph/Hidden/Sph");
+        var ssfShader = settings.SsfShader;
+        if (ssfShader == null)
+            ssfShader = Shader.Find("SampleSsf/Hidden/Ssf");
 
-        var sphMaterial = CoreUtils.CreateEngineMaterial(sphShader);
-        sphMaterial.enableInstancing = true;
-        sphMaterial.SetColor("_Tint", settings.Tint);
-        sphMaterial.SetColor("_AmbientColor", settings.AmbientColor);
-        sphMaterial.SetColor("_SpecColor", settings.SpecularColor);
-        sphMaterial.SetFloat("_Gloss", settings.Glossiness);
-        sphMaterial.SetFloat("_RimAmount", settings.RimAmount);
-        sphMaterial.SetFloat("_RimThreshold", settings.RimThreshold);
-        sphMaterial.SetFloat("_DepthThreshold", settings.DepthThreshold);
-        sphMaterial.SetFloat("_DepthScaleFactor", settings.DepthScaleFactor);
-        sphMaterial.SetFloat("_DistortionStrength", settings.DistortionStrength);
-        sphMaterial.SetColor("_EdgeColor", settings.EdgeColor);
-        sphMaterial.SetInt("_EdgeScaleFactor", settings.EdgeScaleFactor);
-        sphMaterial.SetFloat("_EdgeDepthThreshold", settings.EdgeDepthThreshold);
-        sphMaterial.SetFloat("_EdgeNormalThreshold", settings.EdgeNormalThreshold);
+        var ssfMaterial = CoreUtils.CreateEngineMaterial(ssfShader);
+        ssfMaterial.enableInstancing = true;
+        ssfMaterial.SetColor("_Tint", settings.Tint);
+        ssfMaterial.SetColor("_AmbientColor", settings.AmbientColor);
+        ssfMaterial.SetColor("_SpecColor", settings.SpecularColor);
+        ssfMaterial.SetFloat("_Gloss", settings.Glossiness);
+        ssfMaterial.SetFloat("_RimAmount", settings.RimAmount);
+        ssfMaterial.SetFloat("_RimThreshold", settings.RimThreshold);
+        ssfMaterial.SetFloat("_DepthThreshold", settings.DepthThreshold);
+        ssfMaterial.SetFloat("_DepthScaleFactor", settings.DepthScaleFactor);
+        ssfMaterial.SetFloat("_DistortionStrength", settings.DistortionStrength);
+        ssfMaterial.SetColor("_EdgeColor", settings.EdgeColor);
+        ssfMaterial.SetInt("_EdgeScaleFactor", settings.EdgeScaleFactor);
+        ssfMaterial.SetFloat("_EdgeDepthThreshold", settings.EdgeDepthThreshold);
+        ssfMaterial.SetFloat("_EdgeNormalThreshold", settings.EdgeNormalThreshold);
 
         var renderQueueRange = new RenderQueueRange(
             settings.RenderQueueLowerBound,
             settings.RenderQueueUpperBound);
 
-        pass = new SphPass(
+        pass = new SsfPass(
             settings.Event,
-            sphMaterial,
+            ssfMaterial,
             settings.BlurryIterations,
             settings.LayerMask,
             renderQueueRange);

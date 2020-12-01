@@ -2,12 +2,12 @@
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-public class SphPass : ScriptableRenderPass
+public class SsfPass : ScriptableRenderPass
 {
     int BlurringIterations => blurringTargetHandles.Length;
 
-    readonly ProfilingSampler profilingSampler = new ProfilingSampler("Sph");
-    readonly ShaderTagId sphDepthShaderTagId = new ShaderTagId("SphBillboardSphereDepth");
+    readonly ProfilingSampler profilingSampler = new ProfilingSampler("Ssf");
+    readonly ShaderTagId ssfDepthShaderTagId = new ShaderTagId("SsfBillboardSphereDepth");
 
     readonly Material material;
     readonly RenderTargetHandle depthTargetHandle;
@@ -22,7 +22,7 @@ public class SphPass : ScriptableRenderPass
     RenderTargetIdentifier source;
     FilteringSettings filteringSettings;
 
-    public SphPass(
+    public SsfPass(
         RenderPassEvent renderPassEvent,
         Material material,
         int blurryIterations,
@@ -39,13 +39,13 @@ public class SphPass : ScriptableRenderPass
             blurringTargetHandles[i].Init($"_BlurTemp{i}");
         }
 
-        depthTargetHandle.Init("_SphDepthTexture");
-        depthNormalTargetHandle.Init("_SphNormalTexture");
+        depthTargetHandle.Init("_SsfDepthTexture");
+        depthNormalTargetHandle.Init("_SsfNormalTexture");
 
         downSamplingPass = material.FindPass("DownSampling");
         upSamplingPass = material.FindPass("UpSampling");
         depthNormalPass = material.FindPass("DepthNormal");
-        litPass = material.FindPass("SphLit");
+        litPass = material.FindPass("SsfLit");
     }
 
     public void SetUp(RenderTargetIdentifier source)
@@ -87,12 +87,9 @@ public class SphPass : ScriptableRenderPass
     {
         var cmd = CommandBufferPool.Get(profilingSampler.name);
 
-        // cmd.SetRenderTarget(depthTargetHandle.id);
-        // cmd.ClearRenderTarget(true, true, Color.red, 1f);
-
         // Draw depth
         var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
-        var drawSettings = CreateDrawingSettings(sphDepthShaderTagId, ref renderingData, sortFlags);
+        var drawSettings = CreateDrawingSettings(ssfDepthShaderTagId, ref renderingData, sortFlags);
         drawSettings.perObjectData = PerObjectData.None;
         context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
@@ -130,7 +127,7 @@ public class SphPass : ScriptableRenderPass
 
         // Lighting
 
-        cmd.SetGlobalTexture("_SphDepthNormalTexture", depthNormalTargetHandle.id);
+        cmd.SetGlobalTexture("_SsfDepthNormalTexture", depthNormalTargetHandle.id);
         cmd.Blit(source, source, material, litPass);
 
         context.ExecuteCommandBuffer(cmd);
