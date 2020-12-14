@@ -88,6 +88,7 @@ public class SsfPass : ScriptableRenderPass
         var cmd = CommandBufferPool.Get(profilingSampler.name);
 
         // Draw depth
+
         var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
         var drawSettings = CreateDrawingSettings(ssfDepthShaderTagId, ref renderingData, sortFlags);
         drawSettings.perObjectData = PerObjectData.None;
@@ -95,12 +96,12 @@ public class SsfPass : ScriptableRenderPass
 
         // Blurring
 
-        var currentSource = default(RenderTargetHandle);
         var currentDestination = depthTargetHandle;
 
         // Down sampling
         if (BlurringIterations > 0)
         {
+            RenderTargetHandle currentSource;
             for (var i = 0; i < BlurringIterations; i++)
             {
                 currentSource = currentDestination;

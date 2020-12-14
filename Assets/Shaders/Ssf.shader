@@ -157,13 +157,7 @@
 
             float3 ReconstructPosition(float2 uv, float depth)
             {
-                // float x = uv.x * 2 - 1;
-                // float y = (1 - uv.y) * 2 - 1;
                 float2 positionNDC = uv;
-                // float4 positionCS = ComputeClipSpacePosition(float2(x, y), depth);
-                // // float4 positionNDC = float4(x, y, depth, 1);
-                // float4 positionVS = mul(_MatrixClipToView, positionCS);
-                // return positionVS / positionVS.w;
                 return ComputeViewSpacePosition(positionNDC, depth, _MatrixClipToView);
             }
 
@@ -175,8 +169,6 @@
 
                 float3 pos = ReconstructPosition(input.uv, depth);
                 float3 n = normalize(cross(ddy(pos.xyz), ddx(pos.xyz)));
-                n = 1 - n;
-
                 n *= enabled;
                 depth *= enabled;
                 return EncodeDepthNormal(depth, n);
@@ -270,11 +262,9 @@
                 float depth;
                 float3 n;
                 DecodeDepthNormal(depthNormal, depth, n);
-                n = 1 - n;
+                // n = mul(transpose(UNITY_MATRIX_V), float4(n, 0)).rgb;
 
                 half enabled = depth > 0 ? 1 : 0;
-
-                // Calculate Lighting
 
                 // Diffuse
                 half nDotL = dot(_MainLightPosition.xyz, n);
@@ -286,28 +276,21 @@
                 float3 halfVector = normalize(_MainLightPosition.xyz + viewDir);
                 float nDotH = dot(halfVector, n);
                 float specularIntensity = pow(nDotH * lightIntensity, _Gloss * _Gloss);
-                float specularIntensitySmooth = smoothstep(0.005, 0.01, specularIntensity);
-                float4 specular = specularIntensitySmooth * _SpecColor;
+                specularIntensity = smoothstep(0.005, 0.01, specularIntensity);
 
-                // Rim
-                float rimDot = 1 - dot(viewDir, n);
-				float rimIntensity = rimDot * pow(nDotL, _RimThreshold);
-				rimIntensity = smoothstep(_RimAmount - 0.01, _RimAmount + 0.01, rimIntensity);
-				float4 rim = rimIntensity * _SpecColor;
+                // Edge Detection
+                half edge = EdgeDetection(input.uv, input.viewDirWS);
 
                 // Screen Distortion
                 float2 uvScreenOffset = n.xy * _DistortionStrength * enabled;
                 float2 uvScreenDistort = uv + uvScreenOffset;
                 half4 screen = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uvScreenDistort);
 
-                // Edge Detection
-                half edge = EdgeDetection(input.uv, input.viewDirWS);
-
                 // Merge
-                half3 color = _Tint.rgb * (_AmbientColor + light + specular.rgb + rim);
-                color = lerp(screen.rgb, color, enabled * _Tint.a);
-                color = lerp(color, _EdgeColor.rgb, edge);
-                return half4(color, 1);
+                half4 color = lerp(_Tint * (_AmbientColor + light), _SpecColor, specularIntensity);
+                color = lerp(screen, color, color.a * enabled);
+                color = lerp(color, _EdgeColor, edge);
+                return color;
             }
             ENDHLSL
         }
