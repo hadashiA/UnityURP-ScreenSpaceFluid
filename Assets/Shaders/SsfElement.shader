@@ -64,7 +64,7 @@
                 half d2 = dot(st, st); // squared distance
 
                 // 半径を越える部分は描画しない
-                // TODO: アルファチャンネルがないので clipを使ってる
+                // アルファチャンネルがないので clipを使ってる
                 clip(d2 > 1 ? -1 : 1);
 
                 float3 n = float3(st.xy, sqrt(1 - d2));
