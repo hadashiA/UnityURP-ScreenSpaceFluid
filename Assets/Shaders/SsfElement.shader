@@ -19,7 +19,9 @@
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
 
+            CBUFFER_START(UnityPerMaterial)
             uniform half _Radius;
+            CBUFFER_END
 
             struct Attributes
             {
