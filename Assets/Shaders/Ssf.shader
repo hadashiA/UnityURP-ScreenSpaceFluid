@@ -17,6 +17,8 @@
         #pragma prefer_hlslcc gles
         #pragma exclude_renderers d3d11_9x
 
+        #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+        #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
         #include "Packages/com.unity.render-pipelines.universal/Shaders/UnlitInput.hlsl"
 
         uniform TEXTURE2D(_MainTex);
@@ -36,57 +38,18 @@
             float4 positionCS : SV_POSITION;
         };
 
-        // Encoding/decoding [0..1) floats into 8 bit/channel RG. Note that 1.0 will not be encoded properly.
-        inline float2 EncodeFloatRG(float v)
+        float4 PackDepthNormal(float depth, float3 normal)
         {
-            float2 kEncodeMul = float2(1.0, 255.0);
-            float kEncodeBit = 1.0/255.0;
-            float2 enc = kEncodeMul * v;
-            enc = frac (enc);
-            enc.x -= enc.y * kEncodeBit;
-            return enc;
+            float4 packed;
+            packed.xy = PackNormalOctQuadEncode(normal);
+            packed.zw = PackFloatToR8G8(depth);
+            return packed;
         }
 
-        float DecodeFloatRG(float2 enc)
+        void UnpackDepthNormal(float4 packed, out float depth, out float3 normal)
         {
-            float2 kDecodeDot = float2(1.0, 1/255.0);
-            return dot(enc, kDecodeDot);
-        }
-
-        // Encoding/decoding view space normals into 2D 0..1 vector
-        float2 EncodeViewNormalStereo(float3 n)
-        {
-            float kScale = 1.7777;
-            float2 enc;
-            enc = n.xy / (n.z+1);
-            enc /= kScale;
-            enc = enc*0.5+0.5;
-            return enc;
-        }
-
-        float3 DecodeViewNormalStereo(float4 enc4)
-        {
-            float kScale = 1.7777;
-            float3 nn = enc4.xyz*float3(2*kScale,2*kScale,0) + float3(-kScale,-kScale,1);
-            float g = 2.0 / dot(nn.xyz,nn.xyz);
-            float3 n;
-            n.xy = g*nn.xy;
-            n.z = g-1;
-            return n;
-        }
-
-        float4 EncodeDepthNormal(float depth, float3 normal)
-        {
-            float4 enc;
-            enc.xy = EncodeViewNormalStereo(normal);
-            enc.zw = EncodeFloatRG(depth);
-            return enc;
-        }
-
-        void DecodeDepthNormal(float4 enc, out float depth, out float3 normal)
-        {
-            depth = DecodeFloatRG (enc.zw);
-            normal = DecodeViewNormalStereo(enc);
+            normal = UnpackNormalOctQuadEncode(packed.xy);
+            depth = UnpackFloatFromR8G8(packed.zw);
         }
 
         half3 Sample(float2 uv)
@@ -171,7 +134,7 @@
                 float3 n = normalize(cross(ddy(pos.xyz), ddx(pos.xyz)));
                 n *= enabled;
                 depth *= enabled;
-                return EncodeDepthNormal(depth, n);
+                return PackDepthNormal(depth, n);
             }
             ENDHLSL
         }
@@ -218,10 +181,10 @@
                 float4 depthNormal3 = SAMPLE_TEXTURE2D(_SsfDepthNormalTexture, sampler_SsfDepthNormalTexture, uv[3]);
                 float4 depthNormal4 = SAMPLE_TEXTURE2D(_SsfDepthNormalTexture, sampler_SsfDepthNormalTexture, uv[4]);
 
-                DecodeDepthNormal(depthNormal1, depth1, normal1);
-                DecodeDepthNormal(depthNormal2, depth2, normal2);
-                DecodeDepthNormal(depthNormal3, depth3, normal3);
-                DecodeDepthNormal(depthNormal4, depth4, normal4);
+                UnpackDepthNormal(depthNormal1, depth1, normal1);
+                UnpackDepthNormal(depthNormal2, depth2, normal2);
+                UnpackDepthNormal(depthNormal3, depth3, normal3);
+                UnpackDepthNormal(depthNormal4, depth4, normal4);
 
                 float nDotV = dot(normal1, viewDirWS);
 
@@ -261,7 +224,7 @@
                 float4 depthNormal = SAMPLE_TEXTURE2D(_SsfDepthNormalTexture, sampler_SsfDepthNormalTexture, uv);
                 float depth;
                 float3 n;
-                DecodeDepthNormal(depthNormal, depth, n);
+                UnpackDepthNormal(depthNormal, depth, n);
                 // n = mul(transpose(UNITY_MATRIX_V), float4(n, 0)).rgb;
 
                 half enabled = depth > 0 ? 1 : 0;
@@ -275,7 +238,7 @@
                 float3 viewDir = normalize(input.viewDirWS);
                 float3 halfVector = normalize(_MainLightPosition.xyz + viewDir);
                 float nDotH = dot(halfVector, n);
-                float specularIntensity = pow(nDotH * lightIntensity, _Gloss * _Gloss);
+                float specularIntensity = pow(abs(nDotH * lightIntensity), _Gloss * _Gloss);
                 specularIntensity = smoothstep(0.005, 0.01, specularIntensity);
 
                 // Edge Detection
