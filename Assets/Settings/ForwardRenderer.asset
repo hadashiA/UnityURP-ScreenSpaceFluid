@@ -28,11 +28,11 @@ MonoBehaviour:
     DepthThreshold: 0.084
     DepthScaleFactor: 1
     DistortionStrength: 0.025
-    BlurryIterations: 4
+    BlurryIterations: 3
     EdgeColor: {r: 1, g: 1, b: 1, a: 1}
     EdgeScaleFactor: 1
-    EdgeDepthThreshold: 0.034
-    EdgeNormalThreshold: 0.127
+    EdgeDepthThreshold: 0.047
+    EdgeNormalThreshold: 0.205
     RenderQueueLowerBound: 0
     RenderQueueUpperBound: 5000
 --- !u!114 &11400000
