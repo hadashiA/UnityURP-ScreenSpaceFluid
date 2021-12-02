@@ -131,7 +131,8 @@
                 half enabled = 1 - depth01 > _DepthThreshold ? 1 : 0;
 
                 float3 pos = ReconstructPosition(input.uv, depth);
-                float3 n = normalize(cross(ddy(pos.xyz), ddx(pos.xyz)));
+                float3 n = cross(ddy(pos.xyz), ddx(pos.xyz));
+                n = normalize(mul(transpose(UNITY_MATRIX_V), float4(n, 0)).rgb);
                 n *= enabled;
                 depth *= enabled;
                 return PackDepthNormal(depth, n);
@@ -225,7 +226,6 @@
                 float depth;
                 float3 n;
                 UnpackDepthNormal(depthNormal, depth, n);
-                // n = mul(transpose(UNITY_MATRIX_V), float4(n, 0)).rgb;
 
                 half enabled = depth > 0 ? 1 : 0;
 
